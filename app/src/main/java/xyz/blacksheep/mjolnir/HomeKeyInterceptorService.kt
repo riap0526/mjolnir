@@ -31,6 +31,7 @@ import xyz.blacksheep.mjolnir.home.Action
 import xyz.blacksheep.mjolnir.home.Gesture
 import xyz.blacksheep.mjolnir.home.HomeActionLauncher
 import xyz.blacksheep.mjolnir.home.actionLabel
+import xyz.blacksheep.mjolnir.home.validateDisplayId
 import xyz.blacksheep.mjolnir.services.KeepAliveService
 import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
 import xyz.blacksheep.mjolnir.utils.DualScreenLauncher
@@ -106,50 +107,92 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         }
     }
 
+    private fun updateFocusFromSystemSetting(source: String): Boolean {
+        val focusValue = try {
+            Settings.System.getInt(contentResolver, "focus_change", -1)
+        } catch (e: Exception) {
+            DiagnosticsLogger.logEvent(
+                "Focus",
+                "SYSTEM_FOCUS_READ_FAILED",
+                "source=$source message=${e.message}",
+                this
+            )
+            -1
+        }
+        val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val displays = displayManager.displays
+        val displayIds = IntArray(displays.size) { displays[it].displayId }
+        val reportedDisplay = displayManager.getDisplay(focusValue)
+        val validatedDisplayId = validateDisplayId(focusValue, displayIds)
+            ?.takeIf { reportedDisplay?.isValid == true }
+        val availableDisplays = displays.joinToString(prefix = "[", postfix = "]") {
+            "${it.displayId}:valid=${it.isValid}"
+        }
+
+        DiagnosticsLogger.logEvent(
+            "Focus",
+            "SYSTEM_FOCUS_CHANGE",
+            "source=$source value=$focusValue availableDisplays=$availableDisplays valid=${validatedDisplayId != null}",
+            this
+        )
+
+        if (validatedDisplayId == null) return false
+
+        lastFocusedDisplayId = validatedDisplayId
+        DiagnosticsLogger.logEvent(
+            "Focus",
+            "SYSTEM_FOCUS_ACCEPTED",
+            "source=$source displayId=$validatedDisplayId",
+            this
+        )
+        return true
+    }
+
+    private fun updateFocusFromAccessibilityWindows() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_SCAN_SKIPPED", "reason=ApiTooLow", this)
+            return
+        }
+
+        val windows = windows
+        val focused = windows.firstOrNull { it.isFocused && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val active = windows.firstOrNull { it.isActive && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val anyApp = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val chosen = focused ?: active ?: anyApp
+        val displayId = chosen?.displayId
+        if (displayId != null) {
+            lastFocusedDisplayId = displayId
+            DiagnosticsLogger.logEvent(
+                "Focus",
+                "SYSTEM_FOCUS_FALLBACK_RESOLVED",
+                "displayId=$displayId pkg=${chosen.root?.packageName} focused=${chosen.isFocused} active=${chosen.isActive} windowId=${chosen.id}",
+                this
+            )
+            return
+        }
+
+        val windowDump = windows.joinToString(
+            prefix = "[",
+            postfix = "]",
+            limit = 12,
+            truncated = "..."
+        ) { win ->
+            val winPkg = win.root?.packageName?.toString()
+            "id=${win.id},disp=${win.displayId},type=${win.type},focused=${win.isFocused},active=${win.isActive},pkg=$winPkg"
+        }
+        DiagnosticsLogger.logEvent(
+            "Focus",
+            "SYSTEM_FOCUS_UNRESOLVED",
+            "windowCount=${windows.size} windows=$windowDump",
+            this
+        )
+    }
+
     private val focusChangeObserver = object : android.database.ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
             super.onChange(selfChange)
-            val focusValue = try {
-                Settings.System.getInt(contentResolver, "focus_change", -1)
-            } catch (e: Exception) {
-                -1
-            }
-            DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_CHANGE", "value=$focusValue", this@HomeKeyInterceptorService)
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_SCAN_SKIPPED", "reason=ApiTooLow", this@HomeKeyInterceptorService)
-                return
-            }
-
-            val windows = windows
-            val focused = windows.firstOrNull { it.isFocused && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            val active = windows.firstOrNull { it.isActive && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            val anyApp = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            val chosen = focused ?: active ?: anyApp
-            val displayId = chosen?.displayId
-            if (displayId != null) {
-                lastFocusedDisplayId = displayId
-                DiagnosticsLogger.logEvent(
-                    "Focus",
-                    "SYSTEM_FOCUS_RESOLVED",
-                    "displayId=$displayId pkg=${chosen.root?.packageName} focused=${chosen.isFocused} active=${chosen.isActive} windowId=${chosen.id}",
-                    this@HomeKeyInterceptorService
-                )
-            } else {
-                val windowDump = windows.joinToString(
-                    prefix = "[",
-                    postfix = "]",
-                    limit = 12,
-                    truncated = "..."
-                ) { win ->
-                    val winPkg = win.root?.packageName?.toString()
-                    "id=${win.id},disp=${win.displayId},type=${win.type},focused=${win.isFocused},active=${win.isActive},pkg=$winPkg"
-                }
-                DiagnosticsLogger.logEvent(
-                    "Focus",
-                    "SYSTEM_FOCUS_UNRESOLVED",
-                    "windowCount=${windows.size} windows=$windowDump",
-                    this@HomeKeyInterceptorService
-                )
+            if (!updateFocusFromSystemSetting(source = "observer")) {
+                updateFocusFromAccessibilityWindows()
             }
         }
     }
@@ -182,11 +225,16 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                 false,
                 focusChangeObserver
             )
-            val initial = Settings.System.getInt(contentResolver, "focus_change", -1)
-            if (initial != -1) {
-                lastFocusedDisplayId = initial
+            val systemFocusAccepted = updateFocusFromSystemSetting(source = "registration")
+            if (!systemFocusAccepted) {
+                updateFocusFromAccessibilityWindows()
             }
-            DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_OBSERVER_REGISTERED", "initial=$initial", this)
+            DiagnosticsLogger.logEvent(
+                "Focus",
+                "SYSTEM_FOCUS_OBSERVER_REGISTERED",
+                "systemFocusAccepted=$systemFocusAccepted cachedDisplayId=$lastFocusedDisplayId",
+                this
+            )
         } catch (e: Exception) {
             DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_OBSERVER_FAILED", "message=${e.message}", this)
         }
@@ -348,12 +396,24 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
      */
     override fun onKeyEvent(event: KeyEvent): Boolean {
         val isInterceptionActive = prefs.getBoolean(KEY_HOME_INTERCEPTION_ACTIVE, false)
+        val isHomeKey = event.keyCode == KeyEvent.KEYCODE_HOME
         val isActualHomeButton = event.scanCode == 102
+        val shouldConsume = isInterceptionActive && isHomeKey && isActualHomeButton
 
-        if (isInterceptionActive && event.keyCode == KeyEvent.KEYCODE_HOME && isActualHomeButton) {
-            DiagnosticsLogger.logEvent("Gesture", "HOME_PRESS", "source=AccessibilityService action=${event.action}", this)
+        if (isHomeKey) {
+            DiagnosticsLogger.logEvent(
+                "Gesture",
+                "HOME_KEY_EVENT",
+                "action=${event.action} scanCode=${event.scanCode} repeatCount=${event.repeatCount} " +
+                    "deviceId=${event.deviceId} downTime=${event.downTime} eventTime=${event.eventTime} " +
+                    "interceptionActive=$isInterceptionActive consumed=$shouldConsume",
+                this
+            )
+        }
+
+        if (shouldConsume) {
             handleHomeGesture(event)
-            return true // Consume the event
+            return true
         }
         return super.onKeyEvent(event)
     }
@@ -497,8 +557,8 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                 performGlobalAction(GLOBAL_ACTION_RECENTS)
             }
             Action.DEFAULT_HOME -> {
-                DiagnosticsLogger.logEvent("Gesture", "ACTION_HOME_PASSTHROUGH", context = this)
-                performGlobalAction(GLOBAL_ACTION_HOME)
+                DiagnosticsLogger.logEvent("Gesture", "ACTION_HOME_FOCUS_TRIGGERED", context = this)
+                actionLauncher.launchDefaultHomeOnFocus()
             }
             Action.TOP_HOME_DEFAULT -> {
                 DiagnosticsLogger.logEvent("Gesture", "ACTION_HOME_TOP_TRIGGERED", context = this)
