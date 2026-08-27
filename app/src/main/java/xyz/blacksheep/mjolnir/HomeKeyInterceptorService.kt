@@ -69,7 +69,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
     private lateinit var actionLauncher: HomeActionLauncher
 
     // Gesture detection state
-    private var homePressCount = 0
+    private val homeGestureState = HomeGestureState()
     private val gestureHandler = Handler(Looper.getMainLooper())
     private var longPressRunnable: Runnable? = null
     private var multiPressTimeoutRunnable: Runnable? = null
@@ -432,68 +432,112 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
      *     - If timer expires: We commit to Single/Double/Triple press based on current count.
      */
     private fun handleHomeGesture(event: KeyEvent) {
-        if (event.action == KeyEvent.ACTION_DOWN) {
-
-            // Cancel pending multi-press resolution if another press starts
-            multiPressTimeoutRunnable?.let {
-                gestureHandler.removeCallbacks(it)
-                multiPressTimeoutRunnable = null
-                 DiagnosticsLogger.logEvent("Gesture", "GESTURE_DISCARDED", "reason=new_press_started", this)
-            }
-
-            // On first press, schedule long-press detection
-            if (homePressCount == 0) {
-                longPressRunnable = Runnable {
-                    DiagnosticsLogger.logEvent("Gesture", "GESTURE_RECOGNIZED", "gesture=LONG_HOME", this)
-                    resolveGesture(isLongPress = true)
-                    resetGestureState()
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> {
+                val downResult = homeGestureState.onDown(event.repeatCount)
+                if (downResult != HomeGestureState.DownResult.ACCEPTED) {
+                    DiagnosticsLogger.logEvent(
+                        "Gesture",
+                        "GESTURE_EVENT_IGNORED",
+                        "reason=$downResult action=DOWN repeatCount=${event.repeatCount}",
+                        this
+                    )
+                    return
                 }
-                gestureHandler.postDelayed(
-                    longPressRunnable!!,
-                    longPressDelayMs.toLong()
-                )
-            }
 
-            // Count this press
-            homePressCount++
-
-        } else if (event.action == KeyEvent.ACTION_UP) {
-
-            // Finger lifted: cancel long-press detection
-            longPressRunnable?.let {
-                gestureHandler.removeCallbacks(it)
-                longPressRunnable = null
-            }
-
-            // Start (or restart) multi-press timeout:
-            // once it expires, we resolve based on homePressCount
-            val timeout = if (useSystemDoubleTapDelay) {
-                ViewConfiguration.getDoubleTapTimeout().toLong()
-            } else {
-                customDoubleTapDelay.toLong()
-            }
-
-            multiPressTimeoutRunnable = Runnable {
-                val gesture = when (homePressCount) {
-                    1 -> Gesture.SINGLE_HOME
-                    2 -> Gesture.DOUBLE_HOME
-                    3 -> Gesture.TRIPLE_HOME
-                    else -> null
+                multiPressTimeoutRunnable?.let {
+                    gestureHandler.removeCallbacks(it)
+                    multiPressTimeoutRunnable = null
                 }
-                if(gesture != null) {
-                     DiagnosticsLogger.logEvent("Gesture", "GESTURE_RECOGNIZED", "gesture=$gesture candidateCount=$homePressCount", this)
+
+                if (homeGestureState.pressCount == 1) {
+                    longPressRunnable = Runnable {
+                        if (!homeGestureState.markLongPressTriggered()) {
+                            DiagnosticsLogger.logEvent(
+                                "Gesture",
+                                "GESTURE_EVENT_IGNORED",
+                                "reason=STALE_LONG_PRESS_TIMER",
+                                this
+                            )
+                            return@Runnable
+                        }
+                        DiagnosticsLogger.logEvent("Gesture", "GESTURE_RECOGNIZED", "gesture=LONG_HOME", this)
+                        resolveGesture(
+                            isLongPress = true,
+                            preserveLongPressRelease = true
+                        )
+                    }
+                    gestureHandler.postDelayed(
+                        longPressRunnable!!,
+                        longPressDelayMs.toLong()
+                    )
                 }
-                resolveGesture(isLongPress = false)
             }
-            gestureHandler.postDelayed(multiPressTimeoutRunnable!!, timeout)
+
+            KeyEvent.ACTION_UP -> {
+                when (val upResult = homeGestureState.onUp()) {
+                    HomeGestureState.UpResult.LONG_PRESS_RELEASE_IGNORED,
+                    HomeGestureState.UpResult.UNMATCHED_IGNORED -> {
+                        DiagnosticsLogger.logEvent(
+                            "Gesture",
+                            "GESTURE_EVENT_IGNORED",
+                            "reason=$upResult action=UP",
+                            this
+                        )
+                        return
+                    }
+                    HomeGestureState.UpResult.ACCEPTED -> Unit
+                }
+
+                longPressRunnable?.let {
+                    gestureHandler.removeCallbacks(it)
+                    longPressRunnable = null
+                }
+
+                val timeout = if (useSystemDoubleTapDelay) {
+                    ViewConfiguration.getDoubleTapTimeout().toLong()
+                } else {
+                    customDoubleTapDelay.toLong()
+                }
+
+                multiPressTimeoutRunnable = Runnable {
+                    val gesture = when (homeGestureState.pressCount) {
+                        1 -> Gesture.SINGLE_HOME
+                        2 -> Gesture.DOUBLE_HOME
+                        3 -> Gesture.TRIPLE_HOME
+                        else -> null
+                    }
+                    if (gesture != null) {
+                        DiagnosticsLogger.logEvent(
+                            "Gesture",
+                            "GESTURE_RECOGNIZED",
+                            "gesture=$gesture candidateCount=${homeGestureState.pressCount}",
+                            this
+                        )
+                    }
+                    resolveGesture(isLongPress = false)
+                }
+                gestureHandler.postDelayed(multiPressTimeoutRunnable!!, timeout)
+            }
+
+            else -> DiagnosticsLogger.logEvent(
+                "Gesture",
+                "GESTURE_EVENT_IGNORED",
+                "reason=UNSUPPORTED_ACTION action=${event.action}",
+                this
+            )
         }
     }
 
     @RequiresPermission(Manifest.permission.VIBRATE)
-    private fun resolveGesture(isLongPress: Boolean = false) {
+    private fun resolveGesture(
+        isLongPress: Boolean = false,
+        preserveLongPressRelease: Boolean = false
+    ) {
         val now = SystemClock.uptimeMillis()
         if (now - lastGestureTimestamp < 200) {
-             DiagnosticsLogger.logEvent("Gesture", "GESTURE_DISCARDED", "reason=debounce", this)
+            DiagnosticsLogger.logEvent("Gesture", "GESTURE_DISCARDED", "reason=debounce", this)
+            resetGestureState(preserveLongPressRelease)
             return
         }
         lastGestureTimestamp = now
@@ -501,7 +545,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         val gesture = if (isLongPress) {
             Gesture.LONG_HOME
         } else {
-            when (homePressCount) {
+            when (homeGestureState.pressCount) {
                 1 -> Gesture.SINGLE_HOME
                 2 -> Gesture.DOUBLE_HOME
                 3 -> Gesture.TRIPLE_HOME
@@ -513,19 +557,21 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
             val action = getConfiguredActionForGesture(gesture)
             DiagnosticsLogger.logEvent("Gesture", "GESTURE_ACTION_DISPATCH", "gesture=$gesture action=$action", this)
 
-            // Optional feedback
             provideHapticFeedback()
             val topLabel = actionLauncher.getTopAppLabel()
             val bottomLabel = actionLauncher.getBottomAppLabel()
             provideToastFeedback("$gesture → ${actionLabel(action, topLabel, bottomLabel)}")
-
-            // Trigger the launcher action
             performAction(action)
         } else {
-            DiagnosticsLogger.logEvent("Gesture", "GESTURE_DISCARDED", "reason=no_matching_action pressCount=$homePressCount", this)
+            DiagnosticsLogger.logEvent(
+                "Gesture",
+                "GESTURE_DISCARDED",
+                "reason=no_matching_action pressCount=${homeGestureState.pressCount}",
+                this
+            )
         }
 
-        resetGestureState()
+        resetGestureState(preserveLongPressRelease)
     }
 
     private fun performAction(action: Action) {
@@ -598,12 +644,12 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         }
     }
 
-    private fun resetGestureState() {
+    private fun resetGestureState(preserveLongPressRelease: Boolean = false) {
         longPressRunnable?.let { gestureHandler.removeCallbacks(it) }
         multiPressTimeoutRunnable?.let { gestureHandler.removeCallbacks(it) }
         longPressRunnable = null
         multiPressTimeoutRunnable = null
-        homePressCount = 0
+        homeGestureState.reset(preserveLongPressRelease)
     }
 
     private fun updateGestureConfig() {
