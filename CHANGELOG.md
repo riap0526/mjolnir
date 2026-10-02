@@ -12,12 +12,20 @@ All notable changes to this project will be documented in this file.
 - **Crash guards**: Fixed a thread-safety bug in the icon cache, and invalid `MAIN_SCREEN` or legacy gesture values no longer crash Mjolnir.
 - Home presses no longer restart the persistent service each time.
 
+## Home routing and gestures (merged from [ghgoodreau/mjolnir](https://github.com/ghgoodreau/mjolnir), `fix/focused-home-routing`)
+- **FOCUS: Home** now opens the default home on the focused display instead of letting the system pick one.
+- The vendor `focus_change` value is only trusted when it is a real display id (on the Thor it never is).
+- Home gestures ignore key repeats and unmatched events, and the release after a long press no longer triggers a second gesture evaluation.
+
 ## Diagnostics
 - Logs why the previous Mjolnir process ended (low memory, crash, task cleaner, ...), settings recovery, Home activity decisions, real launch results, and when the SafetyNet screen becomes visible.
 - Log lines are written in order with accurate timestamps.
 
 ## Build
 - Release signing via `keystore.properties` or environment variables, plus an SDK setup script. See `docs/BUILDING.md`.
+- GitHub Actions builds debug and signed release APKs; `v*` tags publish a GitHub Release.
+
+Details: `docs/notes/2026-10-02-stability-round-1.md`.
 
 ---
 
