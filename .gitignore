@@ -11,3 +11,8 @@ local.properties
 /app/release
 /.google/
 /.googleold/
+
+# Release signing secrets (see docs/BUILDING.md)
+keystore.properties
+*.jks
+*.keystore

@@ -1,7 +1,22 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
 }
+
+// Release signing comes from keystore.properties at the repo root (git-ignored) or from
+// MJOLNIR_* environment variables. Without either, release builds are left unsigned.
+// See docs/BUILDING.md.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun signingValue(propertyKey: String, envKey: String): String? =
+    keystoreProperties.getProperty(propertyKey) ?: System.getenv(envKey)
+
+val releaseStoreFile = signingValue("storeFile", "MJOLNIR_KEYSTORE_FILE")
 
 android {
     namespace = "xyz.blacksheep.mjolnir"
@@ -17,8 +32,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile)
+                storePassword = signingValue("storePassword", "MJOLNIR_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "MJOLNIR_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "MJOLNIR_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseStoreFile != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
