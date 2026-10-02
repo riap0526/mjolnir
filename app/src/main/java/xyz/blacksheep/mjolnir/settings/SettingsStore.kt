@@ -184,6 +184,7 @@ object SettingsStore {
     internal fun applyEdits(context: Context, edits: Map<String, Any?>, removals: Set<String>, clear: Boolean) {
         synchronized(lock) {
             val state = loadState(context)
+            val before = state.values.toMap() to state.blacklist.toSet()
             if (clear) {
                 state.values.clear()
                 state.blacklist.clear()
@@ -206,7 +207,11 @@ object SettingsStore {
                     state.values[key] = value
                 }
             }
-            writeAll(context, state)
+            // Writes are fsync'd, so skip the common no-op edits (e.g. resetting a counter that is
+            // already 0 on every Home launch).
+            if ((state.values.toMap() to state.blacklist.toSet()) != before) {
+                writeAll(context, state)
+            }
         }
     }
 
