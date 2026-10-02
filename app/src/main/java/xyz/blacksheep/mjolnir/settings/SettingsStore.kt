@@ -10,6 +10,7 @@ import xyz.blacksheep.mjolnir.*
 import xyz.blacksheep.mjolnir.home.Action
 import xyz.blacksheep.mjolnir.utils.KEY_DIAGNOSTICS_ENABLED
 import xyz.blacksheep.mjolnir.utils.KEY_DIAGNOSTICS_MAX_BYTES
+import xyz.blacksheep.mjolnir.utils.DurableFiles
 import java.io.File
 import java.io.StringReader
 import java.util.Properties
@@ -218,32 +219,41 @@ object SettingsStore {
 
         val values = mutableMapOf<String, Any?>()
         val blacklist = mutableSetOf<String>()
-        var migrationDone = false
+        val issues = mutableListOf<String>()
 
-        if (settingsFile.exists() || configFile.exists() || blacklistFile.exists()) {
-            values.putAll(readJson(settingsFile))
-            val iniValues = readIni(configFile)
-            values.putAll(iniValues)
-            blacklist.addAll(readBlacklist(blacklistFile))
-            val migrationValue = iniValues[MIGRATION_KEY]?.toString()?.lowercase()
-            migrationDone = migrationValue == "true"
+        val settingsRead = readTracked(settingsFile, ::isValidJson, issues)
+        val iniRead = readTracked(configFile, ::isValidIni, issues)
+        val blacklistRead = readTracked(blacklistFile, ::isValidBlacklist, issues)
+
+        values.putAll(parseJson(settingsRead.text))
+        val iniValues = parseIni(iniRead.text)
+        values.putAll(iniValues)
+        parseBlacklist(blacklistRead.text)?.let { blacklist.addAll(it) }
+        val migrationValue = iniValues[MIGRATION_KEY]?.toString()?.lowercase()
+
+        // Legacy SharedPreferences only fill gaps (first run, or config.ini lost). They must never
+        // override values read from disk: after the first migration they can be months out of date.
+        if (migrationValue != "true") {
+            migrateFromPrefs(context, values, blacklist, includeBlacklist = blacklistRead.text == null)
         }
 
-        if (!migrationDone) {
-            migrateFromPrefs(context, values, blacklist)
-            migrationDone = true
-        }
-
-        val state = State(values, blacklist, migrationDone)
+        loadIssues = issues
+        val state = State(values, blacklist, migrationDone = true)
         writeAll(context, state)
         cachedState = state
         return state
     }
 
-    private fun migrateFromPrefs(context: Context, values: MutableMap<String, Any?>, blacklist: MutableSet<String>) {
+    private fun migrateFromPrefs(
+        context: Context,
+        values: MutableMap<String, Any?>,
+        blacklist: MutableSet<String>,
+        includeBlacklist: Boolean
+    ) {
         val legacy = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         keyTypes.keys.forEach { key ->
             if (key == KEY_APP_BLACKLIST) return@forEach
+            if (values.containsKey(key)) return@forEach
             if (!legacy.contains(key)) return@forEach
             val type = keyTypes[key]
             val value: Any? = when (type) {
@@ -256,6 +266,7 @@ object SettingsStore {
             }
             if (value != null) values[key] = value
         }
+        if (!includeBlacklist) return
         if (legacy.contains(KEY_APP_BLACKLIST)) {
             val legacyBlacklist = legacy.getStringSet(KEY_APP_BLACKLIST, emptySet()) ?: emptySet()
             blacklist.addAll(legacyBlacklist)
@@ -268,10 +279,53 @@ object SettingsStore {
         }
     }
 
-    private fun readJson(file: File): Map<String, Any?> {
-        if (!file.exists()) return emptyMap()
+    /**
+     * Problems found while loading the settings files (e.g. recovered from backup).
+     * Diagnostics cannot be written from here (it reads these settings), so callers log them later.
+     */
+    @Volatile private var loadIssues: List<String> = emptyList()
+
+    fun consumeLoadIssues(): List<String> {
+        val issues = loadIssues
+        loadIssues = emptyList()
+        return issues
+    }
+
+    private fun readTracked(file: File, isValid: (String) -> Boolean, issues: MutableList<String>): DurableFiles.ReadResult {
+        val result = DurableFiles.read(file, isValid)
+        val issue = when {
+            result.source == DurableFiles.Source.BACKUP -> "${file.name}: primary unreadable, recovered from backup"
+            result.source == DurableFiles.Source.NONE && file.exists() -> "${file.name}: unreadable and no valid backup"
+            else -> null
+        }
+        if (issue != null) {
+            Log.w(TAG, issue)
+            issues += issue
+        }
+        return result
+    }
+
+    private fun isValidJson(text: String): Boolean = try {
+        JSONObject(text)
+        true
+    } catch (e: Exception) {
+        false
+    }
+
+    // writeIni always emits the migration key, so its absence means a truncated or foreign file.
+    private fun isValidIni(text: String): Boolean = text.lineSequence().any { it.trim().startsWith("$MIGRATION_KEY=") }
+
+    private fun isValidBlacklist(text: String): Boolean = try {
+        val root = JSONTokener(text).nextValue()
+        root is JSONArray || root is JSONObject
+    } catch (e: Exception) {
+        false
+    }
+
+    private fun parseJson(text: String?): Map<String, Any?> {
+        if (text == null) return emptyMap()
         return try {
-            val json = JSONObject(file.readText())
+            val json = JSONObject(text)
             val map = mutableMapOf<String, Any?>()
             json.keys().forEach { key ->
                 if (!userFacingKeys.contains(key)) return@forEach
@@ -292,11 +346,11 @@ object SettingsStore {
         }
     }
 
-    private fun readIni(file: File): Map<String, Any?> {
-        if (!file.exists()) return emptyMap()
+    private fun parseIni(text: String?): Map<String, Any?> {
+        if (text == null) return emptyMap()
         return try {
             val props = Properties()
-            props.load(StringReader(file.readText()))
+            props.load(StringReader(text))
             val map = mutableMapOf<String, Any?>()
             props.stringPropertyNames().forEach { key ->
                 val type = keyTypes[key]
@@ -317,10 +371,11 @@ object SettingsStore {
         }
     }
 
-    private fun readBlacklist(file: File): Set<String> {
-        if (!file.exists()) return emptySet()
+    /** @return The blacklisted packages, or `null` if there is no readable blacklist. */
+    private fun parseBlacklist(text: String?): Set<String>? {
+        if (text == null) return null
         return try {
-            val root = JSONTokener(file.readText()).nextValue()
+            val root = JSONTokener(text).nextValue()
             val set = mutableSetOf<String>()
             when (root) {
                 is JSONArray -> {
@@ -340,7 +395,7 @@ object SettingsStore {
             set
         } catch (e: Exception) {
             Log.w(TAG, "Failed to read blacklist.json: ${e.message}")
-            emptySet()
+            null
         }
     }
 
@@ -404,11 +459,7 @@ object SettingsStore {
     }
 
     private fun atomicWrite(file: File, content: String) {
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(content)
-        if (!tmp.renameTo(file)) {
-            file.writeText(content)
-        }
+        DurableFiles.write(file, content)
     }
 
     private fun baseDir(context: Context): File {
