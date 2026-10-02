@@ -56,5 +56,4 @@
 ## 工程基礎
 
 21. **測試**：把手勢狀態機抽成不依賴 Android 的類別並寫單元測試；為 `DurableFiles`、`SettingsStore` 的解析與遷移、設定驗證補測試。
-22. **CI**：GitHub Actions 跑 `assembleDebug`、`lint`、`testDebugUnitTest`。
-23. **雲端建置環境**：需要在環境的網路設定中允許 `dl.google.com`、`maven.google.com`、`downloads.gradle.org`，才能執行 `scripts/setup-android-sdk.sh` 並建置。
+22. **CI**：已有 `.github/workflows/android.yml`（debug 建置、單元測試、簽章 release、tag 發佈）。尚未加入 `lint`：目前專案的 lint 結果還沒整理，直接加入可能讓 CI 一開始就失敗。
