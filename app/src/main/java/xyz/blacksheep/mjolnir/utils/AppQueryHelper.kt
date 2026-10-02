@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable
 import xyz.blacksheep.mjolnir.KEY_APP_BLACKLIST
 import xyz.blacksheep.mjolnir.PREFS_NAME
 import xyz.blacksheep.mjolnir.settings.settingsPrefs
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * A simple data class holding the display information for an installed application.
@@ -156,8 +157,9 @@ class AppQueryHelper(private val context: Context) {
     }
 
     companion object {
-        // volatile in-memory cache, shared across the app process
-        private val iconCache = mutableMapOf<String, Drawable>()
+        // In-memory cache shared across the app process. Written by the startup prewarm on a
+        // background thread while UI and launch code read it, so it must be thread-safe.
+        private val iconCache = ConcurrentHashMap<String, Drawable>()
 
         /**
          * Retrieves an icon from the in-memory cache or loads it from the PackageManager if missing.

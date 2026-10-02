@@ -471,18 +471,21 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
     private fun performAction(action: Action) {
         DiagnosticsLogger.logEvent("Launcher", "PERFORM_ACTION_TRIGGERED", "action=$action", this)
 
-        // Notify KeepAliveService that a gesture was processed.
-        // This acts as a "liveness check" to refresh the notification status if it's stale (e.g. "Invalid Configuration").
-        val updateIntent = Intent(this, KeepAliveService::class.java).apply {            this.action = KeepAliveService.ACTION_UPDATE_STATUS // Use "this.action" to refer to the Intent's property
-        }
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(updateIntent)
-            } else {
-                startService(updateIntent)
+        // Revive KeepAliveService if it is gone. Doing this on every press rebuilt the notification
+        // (several system queries) right before the launch; it already refreshes on settings changes.
+        if (!KeepAliveService.isRunning) {
+            val updateIntent = Intent(this, KeepAliveService::class.java).apply {
+                this.action = KeepAliveService.ACTION_UPDATE_STATUS
             }
-        } catch (e: Exception) {
-            DiagnosticsLogger.logEvent("Error", "FAILED_TO_SEND_UPDATE_STATUS", "msg=${e.message}", this)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(updateIntent)
+                } else {
+                    startService(updateIntent)
+                }
+            } catch (e: Exception) {
+                DiagnosticsLogger.logEvent("Error", "FAILED_TO_SEND_UPDATE_STATUS", "msg=${e.message}", this)
+            }
         }
 
         when (action) {

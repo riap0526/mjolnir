@@ -72,6 +72,7 @@ class KeepAliveService : Service(), SharedPreferences.OnSharedPreferenceChangeLi
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         prefs = settingsPrefs()
         prefs.registerOnSharedPreferenceChangeListener(this)
         
@@ -139,6 +140,7 @@ class KeepAliveService : Service(), SharedPreferences.OnSharedPreferenceChangeLi
 
     override fun onDestroy() {
         super.onDestroy()
+        isRunning = false
         prefs.unregisterOnSharedPreferenceChangeListener(this)
         unregisterScreenshotObserver()
         DiagnosticsLogger.logEvent("Service", "KEEPALIVE_STOPPED", context = this)
@@ -495,6 +497,10 @@ class KeepAliveService : Service(), SharedPreferences.OnSharedPreferenceChangeLi
     }
 
     companion object {
+        /** True while the service instance exists in this process. */
+        @Volatile var isRunning = false
+            private set
+
         private const val NOTIFICATION_ID = 1
         const val ACTION_DUAL_SCREENSHOT = "xyz.blacksheep.mjolnir.ACTION_DUAL_SCREENSHOT"
         const val ACTION_DELETE_SCREENSHOT = "xyz.blacksheep.mjolnir.ACTION_DELETE_SCREENSHOT"
