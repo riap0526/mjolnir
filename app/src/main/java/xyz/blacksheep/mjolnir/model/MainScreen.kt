@@ -13,4 +13,16 @@ package xyz.blacksheep.mjolnir.model
  * The actual display IDs are handled by `DualScreenLauncher` and are not
  * defined here; this enum simply represents user preference.
  */
-enum class MainScreen { TOP, BOTTOM }
+enum class MainScreen {
+    TOP,
+    BOTTOM;
+
+    companion object {
+        /**
+         * Parses a stored preference value, falling back to [TOP] for missing or invalid values
+         * (e.g. a hand-edited settings.json). [valueOf] would throw and crash the Home activity.
+         */
+        fun fromPref(value: String?): MainScreen =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: TOP
+    }
+}

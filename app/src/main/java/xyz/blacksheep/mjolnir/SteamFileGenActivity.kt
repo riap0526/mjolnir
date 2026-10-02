@@ -346,7 +346,7 @@ class SteamFileGenActivity : ComponentActivity() {
         var bottomApp by rememberSaveable { mutableStateOf(prefs.getString(KEY_BOTTOM_APP, null)) }
         var showAllApps by rememberSaveable { mutableStateOf(prefs.getBoolean(KEY_SHOW_ALL_APPS, false)) }
         val initialMainScreenName = prefs.getString(KEY_MAIN_SCREEN, MainScreen.TOP.name)
-        var mainScreen by rememberSaveable { mutableStateOf(MainScreen.valueOf(initialMainScreenName ?: MainScreen.TOP.name)) }
+        var mainScreen by rememberSaveable { mutableStateOf(MainScreen.fromPref(initialMainScreenName)) }
 
         var multiSelectMode by rememberSaveable { mutableStateOf(false) }
         var selectedFiles by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }

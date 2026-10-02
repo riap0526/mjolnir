@@ -181,7 +181,7 @@ class MainActivity : ComponentActivity() {
                 var devMode by rememberSaveable { mutableStateOf(prefs.getBoolean(KEY_DEV_MODE, false)) }
                 var showAllApps by rememberSaveable { mutableStateOf(prefs.getBoolean(KEY_SHOW_ALL_APPS, false)) }
                 val initialMainScreenName = prefs.getString(KEY_MAIN_SCREEN, MainScreen.TOP.name)
-                var mainScreen by rememberSaveable { mutableStateOf(MainScreen.valueOf(initialMainScreenName ?: MainScreen.TOP.name)) }
+                var mainScreen by rememberSaveable { mutableStateOf(MainScreen.fromPref(initialMainScreenName)) }
 
                 val context = this@MainActivity
                 var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context, HomeKeyInterceptorService::class.java)) }
