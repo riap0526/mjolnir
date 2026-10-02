@@ -60,7 +60,6 @@ class HomeActionLauncher(private val context: Context) {
         private val TRACE_ID = AtomicLong(0)
     }
 
-    private enum class FocusTarget { TOP, BOTTOM }
 
     private fun nextTraceId(): Long = TRACE_ID.incrementAndGet()
 
@@ -134,11 +133,7 @@ class HomeActionLauncher(private val context: Context) {
         val cachedDisplayId = HomeKeyInterceptorService.lastFocusedDisplayId
         if (cachedDisplayId != null) {
             val (topId, bottomId) = resolveDisplayIds()
-            val target = when (cachedDisplayId) {
-                topId -> FocusTarget.TOP
-                bottomId -> FocusTarget.BOTTOM
-                else -> null
-            }
+            val target = resolveFocusTarget(cachedDisplayId, topId, bottomId)
             DiagnosticsLogger.logEvent(TAG, "FOCUS_CACHE_HIT", "cachedDisplayId=$cachedDisplayId target=$target", context)
             if (target != null) return target
             DiagnosticsLogger.logEvent(TAG, "FOCUS_CACHE_MISS", "cachedDisplayId=$cachedDisplayId topId=$topId bottomId=$bottomId", context)
@@ -148,11 +143,7 @@ class HomeActionLauncher(private val context: Context) {
 
         val focusedDisplayId = resolveFocusedDisplayId() ?: return null
         val (topId, bottomId) = resolveDisplayIds()
-        val target = when (focusedDisplayId) {
-            topId -> FocusTarget.TOP
-            bottomId -> FocusTarget.BOTTOM
-            else -> null
-        }
+        val target = resolveFocusTarget(focusedDisplayId, topId, bottomId)
         DiagnosticsLogger.logEvent(TAG, "FOCUS_TARGET_RESOLVED", "focusedDisplayId=$focusedDisplayId target=$target", context)
         return target
     }
@@ -579,6 +570,30 @@ class HomeActionLauncher(private val context: Context) {
                 DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=BOTTOM package=$targetPkg message=App not found", context)
             }
         }
+    }
+
+    fun launchDefaultHomeOnFocus() {
+        val traceId = nextTraceId()
+        trace("FOCUS_HOME", traceId, "START")
+        val target = resolveFocusTarget()
+
+        when (target) {
+            FocusTarget.TOP -> launchDefaultHomeOnDisplay(isTop = true)
+            FocusTarget.BOTTOM -> launchDefaultHomeOnDisplay(isTop = false)
+            null -> {
+                DiagnosticsLogger.logEvent(
+                    TAG,
+                    "DEFAULT_HOME_FOCUS_FALLBACK",
+                    "reason=NoValidFocusedDisplay",
+                    context
+                )
+                if (context is AccessibilityService) {
+                    context.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+                }
+            }
+        }
+
+        trace("FOCUS_HOME", traceId, "END", "target=$target")
     }
 
     fun launchDefaultHomeOnTop() {

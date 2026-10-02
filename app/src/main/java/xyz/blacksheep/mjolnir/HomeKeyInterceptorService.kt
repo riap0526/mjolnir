@@ -31,6 +31,7 @@ import xyz.blacksheep.mjolnir.home.Action
 import xyz.blacksheep.mjolnir.home.Gesture
 import xyz.blacksheep.mjolnir.home.HomeActionLauncher
 import xyz.blacksheep.mjolnir.home.actionLabel
+import xyz.blacksheep.mjolnir.home.validateDisplayId
 import xyz.blacksheep.mjolnir.services.KeepAliveService
 import xyz.blacksheep.mjolnir.utils.DiagnosticsConfig
 import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
@@ -69,7 +70,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
     private lateinit var actionLauncher: HomeActionLauncher
 
     // Gesture detection state
-    private var homePressCount = 0
+    private val homeGestureState = HomeGestureState()
     private val gestureHandler = Handler(Looper.getMainLooper())
     private var longPressRunnable: Runnable? = null
     private var multiPressTimeoutRunnable: Runnable? = null
@@ -107,51 +108,94 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         }
     }
 
+    private fun updateFocusFromSystemSetting(source: String): Boolean {
+        val focusValue = try {
+            Settings.System.getInt(contentResolver, "focus_change", -1)
+        } catch (e: Exception) {
+            DiagnosticsLogger.logEvent(
+                "Focus",
+                "SYSTEM_FOCUS_READ_FAILED",
+                "source=$source message=${e.message}",
+                this
+            )
+            -1
+        }
+        val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val displays = displayManager.displays
+        val displayIds = IntArray(displays.size) { displays[it].displayId }
+        val reportedDisplay = displayManager.getDisplay(focusValue)
+        val validatedDisplayId = validateDisplayId(focusValue, displayIds)
+            ?.takeIf { reportedDisplay?.isValid == true }
+        val availableDisplays = displays.joinToString(prefix = "[", postfix = "]") {
+            "${it.displayId}:valid=${it.isValid}"
+        }
+
+        DiagnosticsLogger.logEvent(
+            "Focus",
+            "SYSTEM_FOCUS_CHANGE",
+            "source=$source value=$focusValue availableDisplays=$availableDisplays valid=${validatedDisplayId != null}",
+            this
+        )
+
+        if (validatedDisplayId == null) return false
+
+        lastFocusedDisplayId = validatedDisplayId
+        DiagnosticsLogger.logEvent(
+            "Focus",
+            "SYSTEM_FOCUS_ACCEPTED",
+            "source=$source displayId=$validatedDisplayId",
+            this
+        )
+        return true
+    }
+
+    private fun updateFocusFromAccessibilityWindows() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_SCAN_SKIPPED", "reason=ApiTooLow", this)
+            return
+        }
+
+        val windows = windows
+        val focused = windows.firstOrNull { it.isFocused && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val active = windows.firstOrNull { it.isActive && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val anyApp = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val chosen = focused ?: active ?: anyApp
+        val displayId = chosen?.displayId
+        if (displayId != null) {
+            lastFocusedDisplayId = displayId
+            DiagnosticsLogger.logEvent(
+                "Focus",
+                "SYSTEM_FOCUS_FALLBACK_RESOLVED",
+                "displayId=$displayId pkg=${chosen.root?.packageName} focused=${chosen.isFocused} active=${chosen.isActive} windowId=${chosen.id}",
+                this
+            )
+            return
+        }
+
+        // Building the dump queries every window root over IPC; skip it unless logging.
+        if (!DiagnosticsConfig.isEnabled(this)) return
+        val windowDump = windows.joinToString(
+            prefix = "[",
+            postfix = "]",
+            limit = 12,
+            truncated = "..."
+        ) { win ->
+            val winPkg = win.root?.packageName?.toString()
+            "id=${win.id},disp=${win.displayId},type=${win.type},focused=${win.isFocused},active=${win.isActive},pkg=$winPkg"
+        }
+        DiagnosticsLogger.logEvent(
+            "Focus",
+            "SYSTEM_FOCUS_UNRESOLVED",
+            "windowCount=${windows.size} windows=$windowDump",
+            this
+        )
+    }
+
     private val focusChangeObserver = object : android.database.ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
             super.onChange(selfChange)
-            val focusValue = try {
-                Settings.System.getInt(contentResolver, "focus_change", -1)
-            } catch (e: Exception) {
-                -1
-            }
-            DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_CHANGE", "value=$focusValue", this@HomeKeyInterceptorService)
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_SCAN_SKIPPED", "reason=ApiTooLow", this@HomeKeyInterceptorService)
-                return
-            }
-
-            val windows = windows
-            val focused = windows.firstOrNull { it.isFocused && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            val active = windows.firstOrNull { it.isActive && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            val anyApp = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            val chosen = focused ?: active ?: anyApp
-            val displayId = chosen?.displayId
-            if (displayId != null) {
-                lastFocusedDisplayId = displayId
-                DiagnosticsLogger.logEvent(
-                    "Focus",
-                    "SYSTEM_FOCUS_RESOLVED",
-                    "displayId=$displayId pkg=${chosen.root?.packageName} focused=${chosen.isFocused} active=${chosen.isActive} windowId=${chosen.id}",
-                    this@HomeKeyInterceptorService
-                )
-            } else if (DiagnosticsConfig.isEnabled(this@HomeKeyInterceptorService)) {
-                // Building the dump queries every window root over IPC; skip it unless logging.
-                val windowDump = windows.joinToString(
-                    prefix = "[",
-                    postfix = "]",
-                    limit = 12,
-                    truncated = "..."
-                ) { win ->
-                    val winPkg = win.root?.packageName?.toString()
-                    "id=${win.id},disp=${win.displayId},type=${win.type},focused=${win.isFocused},active=${win.isActive},pkg=$winPkg"
-                }
-                DiagnosticsLogger.logEvent(
-                    "Focus",
-                    "SYSTEM_FOCUS_UNRESOLVED",
-                    "windowCount=${windows.size} windows=$windowDump",
-                    this@HomeKeyInterceptorService
-                )
+            if (!updateFocusFromSystemSetting(source = "observer")) {
+                updateFocusFromAccessibilityWindows()
             }
         }
     }
@@ -184,11 +228,16 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                 false,
                 focusChangeObserver
             )
-            val initial = Settings.System.getInt(contentResolver, "focus_change", -1)
-            if (initial != -1) {
-                lastFocusedDisplayId = initial
+            val systemFocusAccepted = updateFocusFromSystemSetting(source = "registration")
+            if (!systemFocusAccepted) {
+                updateFocusFromAccessibilityWindows()
             }
-            DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_OBSERVER_REGISTERED", "initial=$initial", this)
+            DiagnosticsLogger.logEvent(
+                "Focus",
+                "SYSTEM_FOCUS_OBSERVER_REGISTERED",
+                "systemFocusAccepted=$systemFocusAccepted cachedDisplayId=$lastFocusedDisplayId",
+                this
+            )
         } catch (e: Exception) {
             DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_OBSERVER_FAILED", "message=${e.message}", this)
         }
@@ -350,12 +399,24 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
      */
     override fun onKeyEvent(event: KeyEvent): Boolean {
         val isInterceptionActive = prefs.getBoolean(KEY_HOME_INTERCEPTION_ACTIVE, false)
+        val isHomeKey = event.keyCode == KeyEvent.KEYCODE_HOME
         val isActualHomeButton = event.scanCode == 102
+        val shouldConsume = isInterceptionActive && isHomeKey && isActualHomeButton
 
-        if (isInterceptionActive && event.keyCode == KeyEvent.KEYCODE_HOME && isActualHomeButton) {
-            DiagnosticsLogger.logEvent("Gesture", "HOME_PRESS", "source=AccessibilityService action=${event.action}", this)
+        if (isHomeKey) {
+            DiagnosticsLogger.logEvent(
+                "Gesture",
+                "HOME_KEY_EVENT",
+                "action=${event.action} scanCode=${event.scanCode} repeatCount=${event.repeatCount} " +
+                    "deviceId=${event.deviceId} downTime=${event.downTime} eventTime=${event.eventTime} " +
+                    "interceptionActive=$isInterceptionActive consumed=$shouldConsume",
+                this
+            )
+        }
+
+        if (shouldConsume) {
             handleHomeGesture(event)
-            return true // Consume the event
+            return true
         }
         return super.onKeyEvent(event)
     }
@@ -374,68 +435,112 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
      *     - If timer expires: We commit to Single/Double/Triple press based on current count.
      */
     private fun handleHomeGesture(event: KeyEvent) {
-        if (event.action == KeyEvent.ACTION_DOWN) {
-
-            // Cancel pending multi-press resolution if another press starts
-            multiPressTimeoutRunnable?.let {
-                gestureHandler.removeCallbacks(it)
-                multiPressTimeoutRunnable = null
-                 DiagnosticsLogger.logEvent("Gesture", "GESTURE_DISCARDED", "reason=new_press_started", this)
-            }
-
-            // On first press, schedule long-press detection
-            if (homePressCount == 0) {
-                longPressRunnable = Runnable {
-                    DiagnosticsLogger.logEvent("Gesture", "GESTURE_RECOGNIZED", "gesture=LONG_HOME", this)
-                    resolveGesture(isLongPress = true)
-                    resetGestureState()
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> {
+                val downResult = homeGestureState.onDown(event.repeatCount)
+                if (downResult != HomeGestureState.DownResult.ACCEPTED) {
+                    DiagnosticsLogger.logEvent(
+                        "Gesture",
+                        "GESTURE_EVENT_IGNORED",
+                        "reason=$downResult action=DOWN repeatCount=${event.repeatCount}",
+                        this
+                    )
+                    return
                 }
-                gestureHandler.postDelayed(
-                    longPressRunnable!!,
-                    longPressDelayMs.toLong()
-                )
-            }
 
-            // Count this press
-            homePressCount++
-
-        } else if (event.action == KeyEvent.ACTION_UP) {
-
-            // Finger lifted: cancel long-press detection
-            longPressRunnable?.let {
-                gestureHandler.removeCallbacks(it)
-                longPressRunnable = null
-            }
-
-            // Start (or restart) multi-press timeout:
-            // once it expires, we resolve based on homePressCount
-            val timeout = if (useSystemDoubleTapDelay) {
-                ViewConfiguration.getDoubleTapTimeout().toLong()
-            } else {
-                customDoubleTapDelay.toLong()
-            }
-
-            multiPressTimeoutRunnable = Runnable {
-                val gesture = when (homePressCount) {
-                    1 -> Gesture.SINGLE_HOME
-                    2 -> Gesture.DOUBLE_HOME
-                    3 -> Gesture.TRIPLE_HOME
-                    else -> null
+                multiPressTimeoutRunnable?.let {
+                    gestureHandler.removeCallbacks(it)
+                    multiPressTimeoutRunnable = null
                 }
-                if(gesture != null) {
-                     DiagnosticsLogger.logEvent("Gesture", "GESTURE_RECOGNIZED", "gesture=$gesture candidateCount=$homePressCount", this)
+
+                if (homeGestureState.pressCount == 1) {
+                    longPressRunnable = Runnable {
+                        if (!homeGestureState.markLongPressTriggered()) {
+                            DiagnosticsLogger.logEvent(
+                                "Gesture",
+                                "GESTURE_EVENT_IGNORED",
+                                "reason=STALE_LONG_PRESS_TIMER",
+                                this
+                            )
+                            return@Runnable
+                        }
+                        DiagnosticsLogger.logEvent("Gesture", "GESTURE_RECOGNIZED", "gesture=LONG_HOME", this)
+                        resolveGesture(
+                            isLongPress = true,
+                            preserveLongPressRelease = true
+                        )
+                    }
+                    gestureHandler.postDelayed(
+                        longPressRunnable!!,
+                        longPressDelayMs.toLong()
+                    )
                 }
-                resolveGesture(isLongPress = false)
             }
-            gestureHandler.postDelayed(multiPressTimeoutRunnable!!, timeout)
+
+            KeyEvent.ACTION_UP -> {
+                when (val upResult = homeGestureState.onUp()) {
+                    HomeGestureState.UpResult.LONG_PRESS_RELEASE_IGNORED,
+                    HomeGestureState.UpResult.UNMATCHED_IGNORED -> {
+                        DiagnosticsLogger.logEvent(
+                            "Gesture",
+                            "GESTURE_EVENT_IGNORED",
+                            "reason=$upResult action=UP",
+                            this
+                        )
+                        return
+                    }
+                    HomeGestureState.UpResult.ACCEPTED -> Unit
+                }
+
+                longPressRunnable?.let {
+                    gestureHandler.removeCallbacks(it)
+                    longPressRunnable = null
+                }
+
+                val timeout = if (useSystemDoubleTapDelay) {
+                    ViewConfiguration.getDoubleTapTimeout().toLong()
+                } else {
+                    customDoubleTapDelay.toLong()
+                }
+
+                multiPressTimeoutRunnable = Runnable {
+                    val gesture = when (homeGestureState.pressCount) {
+                        1 -> Gesture.SINGLE_HOME
+                        2 -> Gesture.DOUBLE_HOME
+                        3 -> Gesture.TRIPLE_HOME
+                        else -> null
+                    }
+                    if (gesture != null) {
+                        DiagnosticsLogger.logEvent(
+                            "Gesture",
+                            "GESTURE_RECOGNIZED",
+                            "gesture=$gesture candidateCount=${homeGestureState.pressCount}",
+                            this
+                        )
+                    }
+                    resolveGesture(isLongPress = false)
+                }
+                gestureHandler.postDelayed(multiPressTimeoutRunnable!!, timeout)
+            }
+
+            else -> DiagnosticsLogger.logEvent(
+                "Gesture",
+                "GESTURE_EVENT_IGNORED",
+                "reason=UNSUPPORTED_ACTION action=${event.action}",
+                this
+            )
         }
     }
 
     @RequiresPermission(Manifest.permission.VIBRATE)
-    private fun resolveGesture(isLongPress: Boolean = false) {
+    private fun resolveGesture(
+        isLongPress: Boolean = false,
+        preserveLongPressRelease: Boolean = false
+    ) {
         val now = SystemClock.uptimeMillis()
         if (now - lastGestureTimestamp < 200) {
-             DiagnosticsLogger.logEvent("Gesture", "GESTURE_DISCARDED", "reason=debounce", this)
+            DiagnosticsLogger.logEvent("Gesture", "GESTURE_DISCARDED", "reason=debounce", this)
+            resetGestureState(preserveLongPressRelease)
             return
         }
         lastGestureTimestamp = now
@@ -443,7 +548,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         val gesture = if (isLongPress) {
             Gesture.LONG_HOME
         } else {
-            when (homePressCount) {
+            when (homeGestureState.pressCount) {
                 1 -> Gesture.SINGLE_HOME
                 2 -> Gesture.DOUBLE_HOME
                 3 -> Gesture.TRIPLE_HOME
@@ -455,19 +560,21 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
             val action = getConfiguredActionForGesture(gesture)
             DiagnosticsLogger.logEvent("Gesture", "GESTURE_ACTION_DISPATCH", "gesture=$gesture action=$action", this)
 
-            // Optional feedback
             provideHapticFeedback()
             val topLabel = actionLauncher.getTopAppLabel()
             val bottomLabel = actionLauncher.getBottomAppLabel()
             provideToastFeedback("$gesture → ${actionLabel(action, topLabel, bottomLabel)}")
-
-            // Trigger the launcher action
             performAction(action)
         } else {
-            DiagnosticsLogger.logEvent("Gesture", "GESTURE_DISCARDED", "reason=no_matching_action pressCount=$homePressCount", this)
+            DiagnosticsLogger.logEvent(
+                "Gesture",
+                "GESTURE_DISCARDED",
+                "reason=no_matching_action pressCount=${homeGestureState.pressCount}",
+                this
+            )
         }
 
-        resetGestureState()
+        resetGestureState(preserveLongPressRelease)
     }
 
     private fun performAction(action: Action) {
@@ -502,8 +609,8 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                 performGlobalAction(GLOBAL_ACTION_RECENTS)
             }
             Action.DEFAULT_HOME -> {
-                DiagnosticsLogger.logEvent("Gesture", "ACTION_HOME_PASSTHROUGH", context = this)
-                performGlobalAction(GLOBAL_ACTION_HOME)
+                DiagnosticsLogger.logEvent("Gesture", "ACTION_HOME_FOCUS_TRIGGERED", context = this)
+                actionLauncher.launchDefaultHomeOnFocus()
             }
             Action.TOP_HOME_DEFAULT -> {
                 DiagnosticsLogger.logEvent("Gesture", "ACTION_HOME_TOP_TRIGGERED", context = this)
@@ -543,12 +650,12 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         }
     }
 
-    private fun resetGestureState() {
+    private fun resetGestureState(preserveLongPressRelease: Boolean = false) {
         longPressRunnable?.let { gestureHandler.removeCallbacks(it) }
         multiPressTimeoutRunnable?.let { gestureHandler.removeCallbacks(it) }
         longPressRunnable = null
         multiPressTimeoutRunnable = null
-        homePressCount = 0
+        homeGestureState.reset(preserveLongPressRelease)
     }
 
     private fun updateGestureConfig() {
