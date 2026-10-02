@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import xyz.blacksheep.mjolnir.PREFS_NAME
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.concurrent.Executors
 import java.util.Date
 import java.util.Locale
 import xyz.blacksheep.mjolnir.settings.settingsPrefs
@@ -33,6 +34,11 @@ object DiagnosticsLogger {
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private const val LOGCAT_TAG = "MJ_DIAG"
+
+    // A single writer keeps lines in call order and stops appends from racing the size trim.
+    private val writer = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "mjolnir-diagnostics").apply { isDaemon = true }
+    }
 
     /**
      * Initializes the logging system by ensuring the log directory exists.
@@ -309,14 +315,15 @@ object DiagnosticsLogger {
      * Also handles file rotation/trimming if size limits are exceeded.
      */
     private fun writeEntry(tag: String, message: String, context: Context) {
-        coroutineScope.launch {
+        // Stamp at call time, not when the background write happens to run.
+        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+        writer.execute {
             try {
                 val logFile = DiagnosticsConfig.getLogFile(context)
                 val maxLogSize = DiagnosticsConfig.getMaxBytes(context)
                 if (logFile.exists() && logFile.length() > maxLogSize) {
                     trimLogFile(logFile)
                 }
-                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
                 val logLine = "[$timestamp][$tag] $message\n"
                 logFile.appendText(logLine)
                 Log.d(LOGCAT_TAG, "[$tag] $message")
@@ -327,11 +334,6 @@ object DiagnosticsLogger {
         }
     }
 
-    /**
-     * Trims the log file when it exceeds the size limit.
-     *
-     * Strategy: Keeps the *last* 50% of lines (tail), discards the old half.
-     */
     private fun trimLogFile(logFile: File) {
         try {
             val lines = logFile.readLines()

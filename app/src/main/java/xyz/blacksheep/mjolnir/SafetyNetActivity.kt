@@ -1,7 +1,9 @@
 package xyz.blacksheep.mjolnir
 
 import android.os.Bundle
+import android.os.Build
 import android.util.Log
+import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
 import android.app.ActivityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,8 +26,25 @@ class SafetyNetActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         excludeTaskFromRecents()
         Log.d(TAG, "onCreate displayId=${display?.displayId} taskId=$taskId data=${intent?.data}")
+        DiagnosticsLogger.logEvent("SafetyNet", "ACTIVITY_CREATED", "displayId=${currentDisplayId()} taskId=$taskId data=${intent?.data}", this)
         setContent { SafetyNetScreen() }
     }
+
+    // Resumed means the SafetyNet screen is what the user sees on that display: the app that
+    // should be there is gone or was never launched. Logged so those moments can be traced.
+    override fun onResume() {
+        super.onResume()
+        DiagnosticsLogger.logEvent("SafetyNet", "VISIBLE", "displayId=${currentDisplayId()} taskId=$taskId", this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        DiagnosticsLogger.logEvent("SafetyNet", "HIDDEN", "displayId=${currentDisplayId()} taskId=$taskId", this)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun currentDisplayId(): Int? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display?.displayId else windowManager.defaultDisplay?.displayId
 
     private fun excludeTaskFromRecents() {
         val activityManager = getSystemService(ActivityManager::class.java)

@@ -32,6 +32,7 @@ import xyz.blacksheep.mjolnir.home.Gesture
 import xyz.blacksheep.mjolnir.home.HomeActionLauncher
 import xyz.blacksheep.mjolnir.home.actionLabel
 import xyz.blacksheep.mjolnir.services.KeepAliveService
+import xyz.blacksheep.mjolnir.utils.DiagnosticsConfig
 import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
 import xyz.blacksheep.mjolnir.utils.DualScreenLauncher
 import xyz.blacksheep.mjolnir.workarounds.FocusLockOverlayWorkaround
@@ -134,7 +135,8 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                     "displayId=$displayId pkg=${chosen.root?.packageName} focused=${chosen.isFocused} active=${chosen.isActive} windowId=${chosen.id}",
                     this@HomeKeyInterceptorService
                 )
-            } else {
+            } else if (DiagnosticsConfig.isEnabled(this@HomeKeyInterceptorService)) {
+                // Building the dump queries every window root over IPC; skip it unless logging.
                 val windowDump = windows.joinToString(
                     prefix = "[",
                     postfix = "]",
@@ -582,7 +584,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                     bootBottomLaunchDone = true
                     actionLauncher.launchBottom()
                 }, 150)
-            } else if (pendingBootLogCount < 6) {
+            } else if (pendingBootLogCount < 6 && DiagnosticsConfig.isEnabled(this)) {
                 pendingBootLogCount++
                 val windowDump = windows.joinToString(
                     prefix = "[",
@@ -645,7 +647,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                 this
             )
             maybeRetryBootBottom(displayId, pkg)
-        } else {
+        } else if (DiagnosticsConfig.isEnabled(this)) {
             val windowDump = windows.joinToString(
                 prefix = "[",
                 postfix = "]",
