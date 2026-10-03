@@ -228,10 +228,10 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                 false,
                 focusChangeObserver
             )
+            // No window scan here: getWindows() during onServiceConnected blocked the main thread
+            // for 10 s on the Thor (seen right after a process restart), freezing Home handling.
+            // The first accessibility event fills lastFocusedDisplayId instead.
             val systemFocusAccepted = updateFocusFromSystemSetting(source = "registration")
-            if (!systemFocusAccepted) {
-                updateFocusFromAccessibilityWindows()
-            }
             DiagnosticsLogger.logEvent(
                 "Focus",
                 "SYSTEM_FOCUS_OBSERVER_REGISTERED",
