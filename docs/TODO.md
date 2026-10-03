@@ -17,6 +17,7 @@
 ### 2. Thor「全部清除」會殺掉 Mjolnir 行程 🔍
 - **現象**：使用者 log 一個月內 Mjolnir 行程啟動 49 次，只有 10 次是開機，常常數秒內連續重啟 2 到 5 次，且多在「最近使用的應用程式」畫面之後。Mjolnir 自己不出現在最近使用清單裡，所以使用者無法把它上鎖。0.2.3 版曾用獨立的 `:keepalive` 行程避開這個問題，0.2.5c 又拿掉了。
 - **先確認**：`PREVIOUS_PROCESS_EXIT` 的 reason（`USER_REQUESTED`、`LOW_MEMORY`、`CRASH`…）。
+- **10-03 新證據**：喚醒 Thor 時 Mjolnir 被 `SIGNALED`（status=9，也就是 SIGKILL）結束，當時狀態是前景服務（importance=125），**不是**記錄為記憶體不足。使用者回報 ES-DE 和 Smart Launcher 同時重啟，疑似系統或廠商的休眠清理機制在喚醒時殺掉多個行程。下一步：發生後立刻用 `adb shell dumpsys activity exit-info org.es_de.frontend` 比對 ES-DE 的結束時間與原因，並檢查 Thor 的電池最佳化或背景管理設定。
 - **可能做法**：評估恢復獨立行程（注意跨行程後 SettingsStore 的記憶體快取會失去一致性），或其他抵抗清除的方式。
 
 ### 3. Android 14 以上的前景服務類型錯誤 🧪
