@@ -5,6 +5,7 @@ import android.util.Log
 import android.view.ViewConfiguration
 import xyz.blacksheep.mjolnir.home.Action
 import xyz.blacksheep.mjolnir.KEY_ACTIVE_GESTURE_CONFIG
+import xyz.blacksheep.mjolnir.KEY_LEGACY_CUSTOM_PRESET_MIGRATED
 import xyz.blacksheep.mjolnir.settings.settingsPrefs
 import xyz.blacksheep.mjolnir.utils.DurableFiles
 import java.io.File
@@ -40,18 +41,7 @@ object GestureConfigStore {
         val dir = gestureDir(context)
         if (!dir.exists()) dir.mkdirs()
 
-        val legacyCustom = File(dir, "custom.cfg")
-        if (legacyCustom.exists()) {
-            val untitledBase = nextUntitledBase(context)
-            val renamedCustom = File(dir, "$untitledBase.cfg")
-            if (!renamedCustom.exists()) {
-                legacyCustom.renameTo(renamedCustom)
-                val loaded = readConfig(renamedCustom)
-                if (loaded != null) {
-                    writeConfig(context, loaded.copy(fileName = renamedCustom.name, name = untitledBase))
-                }
-            }
-        }
+        migrateLegacyCustomPresetOnce(context, dir)
 
         val existing = dir.listFiles { file -> file.isFile && file.extension == "cfg" }.orEmpty()
         if (existing.isEmpty()) {
@@ -113,6 +103,38 @@ object GestureConfigStore {
                 )
             )
         }
+    }
+
+    /**
+     * Renames the pre-0.2.7 `custom.cfg` preset to `untitled-N.cfg`, exactly once per install.
+     *
+     * This used to run on every load. A preset the user named "custom" (saved as `custom.cfg`)
+     * was then renamed away each time, the still-active `custom.cfg` was recreated from fallback
+     * defaults, and the next load renamed that too: dozens of untitled files, and the user's
+     * actions silently replaced by defaults.
+     */
+    private fun migrateLegacyCustomPresetOnce(context: Context, dir: File) {
+        val prefs = context.settingsPrefs()
+        if (prefs.getBoolean(KEY_LEGACY_CUSTOM_PRESET_MIGRATED, false)) return
+
+        val legacyCustom = File(dir, "custom.cfg")
+        if (legacyCustom.exists()) {
+            val untitledBase = nextUntitledBase(context)
+            val renamedCustom = File(dir, "$untitledBase.cfg")
+            if (!renamedCustom.exists() && legacyCustom.renameTo(renamedCustom)) {
+                DurableFiles.backupOf(legacyCustom).delete()
+                val loaded = readConfig(renamedCustom)
+                if (loaded != null) {
+                    writeConfig(context, loaded.copy(fileName = renamedCustom.name, name = untitledBase))
+                }
+                // Keep the renamed preset active; otherwise loading "custom.cfg" recreates it.
+                if (prefs.getString(KEY_ACTIVE_GESTURE_CONFIG, null) == legacyCustom.name) {
+                    prefs.edit().putString(KEY_ACTIVE_GESTURE_CONFIG, renamedCustom.name).apply()
+                    cachedActive = null
+                }
+            }
+        }
+        prefs.edit().putBoolean(KEY_LEGACY_CUSTOM_PRESET_MIGRATED, true).apply()
     }
 
     fun getActiveConfig(context: Context, forceRefresh: Boolean = false): GestureConfig {

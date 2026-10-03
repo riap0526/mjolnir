@@ -60,6 +60,12 @@ const val KEY_LAST_SEEN_VERSION_CODE = "last_seen_version_code"
 const val KEY_SAFETY_NET_PENDING = "safety_net_pending"
 
 /**
+ * Boolean: the one-time rename of the pre-0.2.7 `gestures/custom.cfg` preset has run.
+ * Without it, a preset the user names "custom" was treated as the legacy file on every load.
+ */
+const val KEY_LEGACY_CUSTOM_PRESET_MIGRATED = "legacy_custom_preset_migrated"
+
+/**
  * Intent action for deleting the source (bottom) screenshot from the result notification.
  */
 const val ACTION_DELETE_SOURCE = "xyz.blacksheep.mjolnir.ACTION_DELETE_SOURCE"
