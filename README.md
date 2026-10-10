@@ -18,6 +18,11 @@ Prefer mixing single-screen activities? **BOTH: Auto** and **FOCUS: Auto** are h
 
 Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and [`docs/notes/`](./docs/notes/).
 
+**v0.2.9** (testing, not released yet)
+
+- **Optional "Hide from Recents" per slot**: keep the top and/or bottom app out of the task switcher (off by default). Adapted from [alexboydray](https://github.com/alexboydray)'s upstream PR [#40](https://github.com/blacksheepmvp/mjolnir/pull/40), extended to also cover launches when Mjolnir is the default home. Note: a hidden app can't be locked in Recents.
+- Removed the in-app donation button; About links to this fork and credits the original project.
+
 **v0.2.8**
 
 - **Settings survive crashes and power loss**: settings and gesture presets are written durably (fsync + `.bak` backup). A corrupt file is restored from the backup and kept as `.corrupt`; deleting a file still resets it as before.
@@ -184,6 +189,7 @@ Bug reports are welcome via [Issues](https://github.com/riap0526/mjolnir/issues)
 
 - **[blacksheepmvp](https://github.com/blacksheepmvp)** — original author of Mjolnir. This fork is based entirely on the code of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir); all original design and features are theirs.
 - **[ghgoodreau](https://github.com/ghgoodreau)** — focused-display Home routing and Home gesture state hardening ([`fix/focused-home-routing`](https://github.com/ghgoodreau/mjolnir/tree/fix/focused-home-routing)), merged into this fork with authorship preserved.
+- **[alexboydray](https://github.com/alexboydray)** — the "Hide from Recents" feature ([blacksheepmvp/mjolnir#40](https://github.com/blacksheepmvp/mjolnir/pull/40)), adapted for this fork.
 
 ---
 

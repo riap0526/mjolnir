@@ -1,0 +1,10 @@
+# Mjolnir v0.2.9
+
+## New
+- Optional "Hide from Recents" switch for the top and bottom apps (Home Launcher settings and setup). Keeps your frontends out of the task switcher. Off by default. Idea and original implementation by alexboydray.
+  - Applies the next time Mjolnir launches the app; clear it from Recents once if it is already there.
+  - A hidden app cannot be locked in Recents. If you lock your frontends to protect them, leave it off.
+
+## Other
+- Removed the donation button from What's New.
+- About now links to this fork and credits the original Mjolnir by blacksheepmvp.

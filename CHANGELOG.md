@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+# Mjolnir v0.2.9 - Hide from Recents (fork, testing)
+
+## Features
+- **Per-slot "Hide from Recents"** (adapted from [alexboydray](https://github.com/alexboydray)'s upstream PR [blacksheepmvp/mjolnir#40](https://github.com/blacksheepmvp/mjolnir/pull/40)): opt-in switches for the top and bottom apps in Home Launcher settings and onboarding. When on, Mjolnir launches that app with `FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS`. Off by default; default-home launches are unaffected.
+  - Unlike the upstream PR, the setting also applies to launches from `HomeActivity` (when Mjolnir is the default home), and it follows the app's package rather than the target display.
+  - Only takes effect when the launch creates a new task. A hidden app cannot be locked in Recents.
+
+## Other
+- Removed the Ko-fi donation button from the What's New dialog.
+- About dialog links to this fork and credits the original project.
+
+---
+
 # Mjolnir v0.2.8 - Stability Update (fork)
 
 First release of the maintained fork ([riap0526/mjolnir](https://github.com/riap0526/mjolnir)). It is signed with a different key than the original releases: back up `/Android/data/xyz.blacksheep.mjolnir/` and uninstall the original before installing (see `docs/BUILDING.md`).

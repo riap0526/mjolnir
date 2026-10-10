@@ -268,7 +268,11 @@ fun HomeSelectionUI(
                         "• Android still shows an app while it's the one in front. It " +
                         "disappears once you switch away.\n\n" +
                         "• Applies when Mjolnir launches the app. If it's already in " +
-                        "Recents, clear it once."
+                        "Recents, clear it once.\n\n" +
+                        "• A hidden app can't be locked in Recents. If you lock your " +
+                        "frontends to keep them from being closed, leave this off. " +
+                        "Whether Clear All or memory cleanup still closes a hidden app " +
+                        "depends on the device."
                 )
             },
             confirmButton = {
