@@ -30,7 +30,8 @@ fun AboutDialog(onDismiss: () -> Unit) {
         }
     }
     val uriHandler = LocalUriHandler.current
-    val githubUrl = "https://github.com/blacksheepmvp/mjolnir"
+    val githubUrl = "https://github.com/riap0526/mjolnir"
+    val upstreamUrl = "https://github.com/blacksheepmvp/mjolnir"
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -46,6 +47,17 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     ),
                     modifier = Modifier.clickable {
                         uriHandler.openUri(githubUrl)
+                    }
+                )
+                Text("Personal-use fork based on the original Mjolnir by blacksheepmvp:")
+                Text(
+                    text = upstreamUrl,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.primary,
+                        textDecoration = TextDecoration.Underline
+                    ),
+                    modifier = Modifier.clickable {
+                        uriHandler.openUri(upstreamUrl)
                     }
                 )
             }

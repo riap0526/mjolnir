@@ -1,0 +1,6 @@
+# Mjolnir v0.2.8a
+
+Small maintenance update on top of v0.2.8. No behavior changes.
+
+- Removed the donation button from What's New.
+- About now links to this fork (github.com/riap0526/mjolnir) and credits the original Mjolnir by blacksheepmvp.

@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+# Mjolnir v0.2.8a - Maintenance (fork)
+
+Same app as v0.2.8; no behavior changes.
+
+- Removed the Ko-fi donation button from the What's New dialog.
+- About dialog links to this fork and credits the original project by blacksheepmvp.
+- README: fork changes, credits and disclaimer.
+
+`versionCode` is 24 so it installs over the unreleased 0.2.9 test builds (22, 23). The "Hide from Recents" feature tested in those builds was dropped: on the AYN Thor the top-screen app stays in Recents whenever it is the most recent task on the default display, so it only ever hid the bottom app.
+
+---
+
 # Mjolnir v0.2.8 - Stability Update (fork)
 
 First release of the maintained fork ([riap0526/mjolnir](https://github.com/riap0526/mjolnir)). It is signed with a different key than the original releases: back up `/Android/data/xyz.blacksheep.mjolnir/` and uninstall the original before installing (see `docs/BUILDING.md`).

@@ -458,12 +458,6 @@ class MainActivity : ComponentActivity() {
                                     onClick = { showWhatsNewDialog = false },
                                     modifier = Modifier.focusRequester(closeWhatsNewFocus).focusable()
                                 ) { Text("Close") }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/xyzblacksheep"))
-                                    startActivity(intent)
-                                }) { Text("Support on Ko-fi") }
                             }
                         )
                     }
