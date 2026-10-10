@@ -128,3 +128,11 @@ A、B 與先前所有修正一起發佈為 **v0.2.8**（第一個正式版，`ve
 - 一般啟動是否不再出現 `ICON_PREWARM_START`；只有打開 Mjolnir 畫面時才出現，並帶有 `source=MainActivity` 或 `source=Onboarding`。
 - `SIGNALED` 是否因為電池最佳化設定而減少。
 
+### 發佈結果
+
+- **v0.2.8 已發佈**：<https://github.com/riap0526/mjolnir/releases/tag/v0.2.8>
+- APK：`mjolnir-0.2.8.apk`（簽章版，約 14.2 MB），說明內容取自 `app/src/main/assets/changelogs/v0.2.8.txt`。
+- tag `v0.2.8` 指向 `65acc4a`。由於雲端環境無法推送 tag，改由 GitHub Actions 手動觸發發佈（`release_tag=v0.2.8`，run 38026671559）。
+- 發佈時發現：同一分支的 push 建置與手動發佈共用同一個 concurrency 群組，push 的建置被發佈取消（反過來也可能取消發佈）。已調整為依事件分組，發佈不會被取消。
+- `main` 分支仍是原作者的版本，這次是從 `claude/intelligent-allen-jbocja` 發佈。
+

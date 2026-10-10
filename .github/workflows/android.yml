@@ -15,9 +15,11 @@ on:
 permissions:
   contents: read
 
+# A newer push supersedes an older build of the same branch, but a release run (manual or tag)
+# is never cancelled: separate group per event, and no cancellation for releases.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
