@@ -64,6 +64,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import xyz.blacksheep.mjolnir.utils.AppQueryHelper
 import xyz.blacksheep.mjolnir.KEY_THEME
 import xyz.blacksheep.mjolnir.PREFS_NAME
 import xyz.blacksheep.mjolnir.model.AppTheme
@@ -81,6 +82,7 @@ class OnboardingActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppQueryHelper.prewarmInBackground(this, source = "Onboarding")
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 

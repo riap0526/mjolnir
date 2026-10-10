@@ -9,10 +9,8 @@ import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.annotation.RequiresApi
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import xyz.blacksheep.mjolnir.utils.AppQueryHelper
 import xyz.blacksheep.mjolnir.utils.DiagnosticsConfig
 import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
@@ -28,12 +26,10 @@ import java.util.Locale
  * **Role:**
  * - Initializes app-wide singletons (Diagnostics, Notification Channels).
  * - Manages process-level startup logic.
- * - Triggers the background "Prewarm" of app icons to ensure UI responsiveness.
  *
  * **Process Awareness:**
- * Mjolnir may run in multiple processes (e.g., `:keepalive` for the foreground service).
- * Heavy initialization (like icon caching) is strictly limited to the main UI process
- * to save memory in the background service.
+ * Startup stays light: most process starts are the system rebinding the accessibility
+ * service, so UI-only work such as icon caching happens when a Mjolnir screen opens.
  */
 class MjolnirApp : Application() {
 
@@ -48,21 +44,19 @@ class MjolnirApp : Application() {
             logStartupContext()
         }
 
-        // Only prewarm icons in the main UI process.
-        // The keepalive process should stay as lightweight as possible.
+        // Icons are only needed by the settings UI, which warms the cache itself
+        // (AppQueryHelper.prewarmInBackground). Most process starts are the system rebinding the
+        // accessibility service, so loading every app icon here only cost memory.
         if (!isKeepAliveProcess()) {
             registerDisplayListener()
-            CoroutineScope(Dispatchers.IO).launch {
-                DiagnosticsLogger.logEvent("App", "ICON_PREWARM_START", "totalApps=N/A", this@MjolnirApp)
-                val startTime = System.currentTimeMillis()
-                try {
-                    AppQueryHelper.prewarmAllApps(this@MjolnirApp)
-                    val duration = System.currentTimeMillis() - startTime
-                    DiagnosticsLogger.logEvent("App", "ICON_PREWARM_END", "durationMs=$duration totalApps=N/A", this@MjolnirApp)
-                } catch (e: Exception) {
-                    DiagnosticsLogger.logException("App", e, this@MjolnirApp)
-                }
-            }
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        // UI_HIDDEN: no Mjolnir screen is visible any more, so the icon cache has no user.
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            AppQueryHelper.clearIconCache()
         }
     }
 
@@ -80,11 +74,14 @@ class MjolnirApp : Application() {
             val activityManager = getSystemService(ActivityManager::class.java)
             val last = activityManager.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull() ?: return
             val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date(last.timestamp))
+            // A shutdown leaves no exit record, so the first start after boot sees an older one.
+            val bootTimeMs = System.currentTimeMillis() - SystemClock.elapsedRealtime()
+            val beforeBoot = last.timestamp < bootTimeMs
             DiagnosticsLogger.logEvent(
                 "App",
                 "PREVIOUS_PROCESS_EXIT",
-                "reason=${exitReasonName(last.reason)} at=$time status=${last.status} importance=${last.importance} " +
-                    "pssKb=${last.pss} rssKb=${last.rss} description=${last.description}",
+                "reason=${exitReasonName(last.reason)} at=$time beforeBoot=$beforeBoot status=${last.status} " +
+                    "importance=${last.importance} pssKb=${last.pss} rssKb=${last.rss} description=${last.description}",
                 this
             )
         } catch (e: Exception) {

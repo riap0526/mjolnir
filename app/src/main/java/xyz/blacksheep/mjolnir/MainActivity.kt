@@ -82,6 +82,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.launch
+import xyz.blacksheep.mjolnir.utils.AppQueryHelper
 import xyz.blacksheep.mjolnir.onboarding.OnboardingActivity
 import xyz.blacksheep.mjolnir.services.KeepAliveService
 import xyz.blacksheep.mjolnir.settings.AboutDialog
@@ -104,6 +105,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         excludeTaskFromRecents()
+        AppQueryHelper.prewarmInBackground(this, source = "MainActivity")
 
         installSplashScreen()
 
