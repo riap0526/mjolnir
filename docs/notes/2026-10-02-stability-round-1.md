@@ -95,3 +95,7 @@ ES-DE 本身的結束原因可以用 `adb shell dumpsys activity exit-info org.e
 - 喚醒時的重啟原因是 `SIGNALED`（SIGKILL），不是記憶體不足，詳見 `docs/TODO.md` 第 2 項。
 - 安裝後首次設定期間出現 5 次 `CONFIG_WIPE reason=invalid_configuration`：當時設定還是空的，Mjolnir 已是預設主畫面，按 Home 會被導回初始設定。這是預期行為，沒有資料被刪除。
 
+
+## 後續
+
+一週實機檢視與後續評估見 [`2026-10-10-week-log-review.md`](2026-10-10-week-log-review.md)。
