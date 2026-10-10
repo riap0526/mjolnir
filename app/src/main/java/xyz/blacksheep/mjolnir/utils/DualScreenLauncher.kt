@@ -30,10 +30,15 @@ object DualScreenLauncher {
      *
      * @param context Android Context (Activity or Service).
      * @param intent The Intent to launch. Flags like `FLAG_ACTIVITY_NEW_TASK` are added automatically.
+     * @param hideFromRecents If true, adds `FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS` so the launched app
+     * does not appear in the Recents / task switcher list.
      * @return `true` if launch was successful, `false` otherwise.
      */
-    fun launchOnTop(context: Context, intent: Intent): Boolean {
+    fun launchOnTop(context: Context, intent: Intent, hideFromRecents: Boolean = false): Boolean {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (hideFromRecents) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+        }
         return try {
             val dm = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
             val topDisplay = dm.displays.getOrNull(0)
@@ -65,16 +70,21 @@ object DualScreenLauncher {
      *
      * @param context Android Context.
      * @param intent The Intent to launch.
+     * @param hideFromRecents If true, adds `FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS` so the launched app
+     * does not appear in the Recents / task switcher list.
      * @return `true` if launch was successful (on either screen).
      */
-    fun launchOnBottom(context: Context, intent: Intent): Boolean {
+    fun launchOnBottom(context: Context, intent: Intent, hideFromRecents: Boolean = false): Boolean {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (hideFromRecents) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+        }
         return try {
             val dm = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
             val bottomDisplay = dm.displays.getOrNull(1)
             if (bottomDisplay == null) {
                 Log.w(TAG, "Could not get bottom display. Falling back to top.")
-                return launchOnTop(context, intent)
+                return launchOnTop(context, intent, hideFromRecents)
             }
 
             @SuppressLint("NewApi")
@@ -111,7 +121,9 @@ object DualScreenLauncher {
         context: Context,
         topIntent: Intent,
         bottomIntent: Intent,
-        mainScreen: MainScreen
+        mainScreen: MainScreen,
+        hideTopFromRecents: Boolean = false,
+        hideBottomFromRecents: Boolean = false
     ): Boolean {
         Log.d(TAG, "Dual-screen launch requested. Main screen to focus: $mainScreen")
         val topSuccess: Boolean
@@ -119,12 +131,12 @@ object DualScreenLauncher {
 
         if (mainScreen == MainScreen.TOP) {
             // Launch bottom first, then top to give top focus.
-            bottomSuccess = launchOnBottom(context, bottomIntent)
-            topSuccess = launchOnTop(context, topIntent)
+            bottomSuccess = launchOnBottom(context, bottomIntent, hideBottomFromRecents)
+            topSuccess = launchOnTop(context, topIntent, hideTopFromRecents)
         } else {
             // Launch top first, then bottom to give bottom focus.
-            topSuccess = launchOnTop(context, topIntent)
-            bottomSuccess = launchOnBottom(context, bottomIntent)
+            topSuccess = launchOnTop(context, topIntent, hideTopFromRecents)
+            bottomSuccess = launchOnBottom(context, bottomIntent, hideBottomFromRecents)
         }
 
         return topSuccess && bottomSuccess
