@@ -66,7 +66,7 @@ keystore 檔本身可以用 base64 存成 secret，建置前再還原成檔案�
 
 1. 建置 debug APK 並跑單元測試，APK 上傳為 artifact（`mjolnir-debug-<commit>`）。
 2. 若 repo 已設定簽章 secrets，再建置**已簽章的 release APK**，上傳為 artifact（`mjolnir-release-<commit>`）。
-3. push `v` 開頭的 tag（例如 `v0.2.8`）時，另外建立 GitHub Release 並附上已簽章的 APK。
+3. push `v` 開頭的 tag（例如 `v0.2.8`），或手動執行時填入 `release_tag`，會另外建立 GitHub Release 並附上已簽章的 APK。
 
 artifact 在 GitHub 的 Actions 頁面、該次執行的 Summary 最下方下載。
 
@@ -85,9 +85,12 @@ artifact 在 GitHub 的 Actions 頁面、該次執行的 Summary 最下方下載
 
 ### 發佈流程
 
-1. 調高 `versionCode`、`versionName`，補上 `app/src/main/assets/changelogs/` 與 `CHANGELOG.md`。
-2. 合併到主分支後打 tag 並 push：`git tag v0.2.8 && git push origin v0.2.8`。
-3. 等 workflow 跑完，到 Releases 頁面確認 APK 與自動產生的說明。
+1. 調高 `versionCode`、`versionName`，新增 `app/src/main/assets/changelogs/v<版本>.txt`（App 內的 What's New，也會當作 Release 說明），並更新 `CHANGELOG.md`。
+2. 發佈，二選一：
+   - **網頁操作**：GitHub → Actions → Android build → Run workflow，選擇要發佈的分支，在 `release_tag` 填入 `v<版本>`（例如 `v0.2.8`）後執行。workflow 會在建置的那個 commit 上建立 tag 和 Release。
+   - **推送 tag**：`git tag v0.2.8 && git push origin v0.2.8`。
+3. workflow 會檢查 tag 和 `versionName` 一致、對應的更新說明檔存在，不符合就停止，不會發佈。
+4. 跑完後到 Releases 頁面確認簽章版 APK 與說明。
 
 ## 從原作者版本換成本 fork（重要）
 
