@@ -2,7 +2,7 @@
 
 > **This is a personal-use fork of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir).** It focuses on **stability fixes and small improvements** to the existing features; there are no major changes or new features. See [Disclaimer](#%EF%B8%8F-disclaimer) and [Credits](#-credits) before using it.
 
-## ⚔️ Mjolnir Dual-Screen Update
+## Mjolnir Dual-Screen Update
 
 Mjolnir is a Home button router built for multi-display Android devices.  
 With **BOTH: Home**, dual-screen frontends (iisu, cocoon, console launcher, etc.) can launch both screens with a single button press.  
@@ -14,7 +14,7 @@ Prefer mixing single-screen activities? **BOTH: Auto** and **FOCUS: Auto** are h
 
 ---
 
-## 🔱 What's Different in This Fork
+## What's Different in This Fork
 
 Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and [`docs/notes/`](./docs/notes/).
 
@@ -38,7 +38,7 @@ Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and 
 
 ---
 
-## ⚡ A Home Button Router for Multi-Display Android Devices
+## A Home Button Router for Multi-Display Android Devices
 
 Mjolnir gives you **precise control** over what happens when you press the Home button — routing frontends or launchers to the top display, bottom display, or both.  
 Originally designed for the **AYN Thor**, it also works on single-screen devices as a powerful Home-button automation tool.
@@ -47,7 +47,7 @@ Originally designed for the **AYN Thor**, it also works on single-screen devices
 
 ---
 
-## 🧠 How Mjolnir Works (Current Behavior)
+## How Mjolnir Works (Current Behavior)
 
 Mjolnir supports two onboarding modes:
 
@@ -72,7 +72,7 @@ Advanced Mode is ideal for:
 
 ---
 
-## ✅ Safety Net Protection
+## Safety Net Protection
 
 Mjolnir includes a Safety Net activity that prevents soft-lock when a screen would otherwise be left with an empty activity stack.  
 Protection status is visible in the persistent notification and in Settings/Onboarding.
@@ -81,7 +81,7 @@ Configs live at: `/Android/data/xyz.blacksheep.mjolnir/`
 
 ---
 
-## 📦 Installation & Setup
+## Installation & Setup
 
 ### 1. **Download**
 
@@ -145,7 +145,7 @@ Add the **SafetyNet Debug** tile to surface SafetyNet activities if needed.
 
 ---
 
-## 🧭 Main Screen Setting (Advanced)
+## Main Screen Setting (Advanced)
 
 **Main screen** is intended to decide which display should receive focus after a dual‑app launch when focus is ambiguous.  
 Right now, it does **not** change behavior because of ongoing issues with simultaneous app launching.  
@@ -153,7 +153,7 @@ In the future, it will be the user’s way of saying “this is where I expect f
 
 ---
 
-## 🔧 Steam File Generator (Included Utility)
+## Steam File Generator (Included Utility)
 
 A helper tool for frontends like ES-DE and Beacon:
 
@@ -178,20 +178,20 @@ SDK setup, release signing and the CI release flow are documented in [`docs/BUIL
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Bug reports are welcome via [Issues](https://github.com/riap0526/mjolnir/issues). This fork is maintained mainly for personal use, so feature requests may not be picked up.
 
 ---
 
-## 🙏 Credits
+## Credits
 
 - **[blacksheepmvp](https://github.com/blacksheepmvp)** — original author of Mjolnir. This fork is based entirely on the code of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir); all original design and features are theirs.
 - **[ghgoodreau](https://github.com/ghgoodreau)** — focused-display Home routing and Home gesture state hardening ([`fix/focused-home-routing`](https://github.com/ghgoodreau/mjolnir/tree/fix/focused-home-routing)), merged into this fork with authorship preserved.
 
 ---
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 - This fork is maintained **primarily for personal use** and is limited to **stability fixes and small improvements** to existing behavior. It does not aim to add major features or redesign the app.
 - The fork exists because the upstream project has not been updated for more than six months; fixes are made here for the maintainer's own device (AYN Thor, Android 13).
