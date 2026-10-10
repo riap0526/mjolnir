@@ -1,8 +1,8 @@
-# **Mjolnir** (riap0526 fork)
+# **Mjolnir** fork
 
-> **This is a personal-use fork of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir).** It focuses on **stability fixes and small improvements** to the existing features; there are no major changes or new features. See [Disclaimer](#%EF%B8%8F-disclaimer) and [Credits](#-credits) before using it.
+> **This is a personal-use fork of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir).** It focuses on **stability fixes and small improvements** to the existing features; there are no major changes or new features. See [Disclaimer](#disclaimer) and [Credits](#credits) before using it.
 
-## ⚔️ Mjolnir Dual-Screen Update
+## Mjolnir Dual-Screen Update
 
 Mjolnir is a Home button router built for multi-display Android devices. It gives you precise control over what happens when you press the Home button — routing frontends or launchers to the top display, bottom display, or both.  
 With **BOTH: Home**, dual-screen frontends (iisu, cocoon, console launcher, etc.) can launch both screens with a single button press.  
@@ -16,7 +16,7 @@ Originally designed for the **AYN Thor**, it also works on single-screen devices
 
 ---
 
-## 🔱 What's Different in This Fork
+## What's Different in This Fork
 
 Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and [`docs/notes/`](./docs/notes/).
 
@@ -40,7 +40,7 @@ Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and 
 
 ---
 
-## 📖 Features & Usage
+## Features & Usage
 
 All features, setup steps and behavior come from the original project. At this stage this fork has **no new features and no major functional changes** — only the fixes listed above.
 
@@ -50,20 +50,20 @@ Settings and logs live in `/Android/data/xyz.blacksheep.mjolnir/`. Building and 
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Bug reports are welcome via [Issues](https://github.com/riap0526/mjolnir/issues). This fork is maintained mainly for personal use, so feature requests may not be picked up.
 
 ---
 
-## 🙏 Credits
+## Credits
 
 - **[blacksheepmvp](https://github.com/blacksheepmvp)** — original author of Mjolnir. This fork is based entirely on the code of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir); all original design and features are theirs.
 - **[ghgoodreau](https://github.com/ghgoodreau)** — focused-display Home routing and Home gesture state hardening ([`fix/focused-home-routing`](https://github.com/ghgoodreau/mjolnir/tree/fix/focused-home-routing)), merged into this fork with authorship preserved.
 
 ---
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 - This fork is maintained **primarily for personal use** and is limited to **stability fixes and small improvements** to existing behavior. It does not aim to add major features or redesign the app.
 - The fork exists because the upstream project has not been updated for more than six months; fixes are made here for the maintainer's own device (AYN Thor, Android 13).
