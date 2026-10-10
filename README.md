@@ -127,7 +127,7 @@ Add the **SafetyNet Debug** tile to surface SafetyNet activities if needed.
 
 ---
 
-## ⚙️ Features
+## Features
 
 - Route Home presses to:
   - Top screen
@@ -166,7 +166,7 @@ This tool will be spun off into its own app in a future release.
 
 ---
 
-## 🛠 Building
+## Building
 
 Open in Android Studio → Sync Gradle → Run, or from the command line:
 
