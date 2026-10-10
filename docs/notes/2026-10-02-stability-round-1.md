@@ -98,4 +98,4 @@ ES-DE 本身的結束原因可以用 `adb shell dumpsys activity exit-info org.e
 
 ## 後續
 
-一週實機檢視與後續評估見 [`2026-10-10-week-log-review.md`](2026-10-10-week-log-review.md)。
+一週實機檢視與後續評估見 [`2026-10-10-week-log-review.md`](2026-10-10-week-log-review.md)；「從最近使用隱藏」評估見 [`2026-10-10-hide-from-recents.md`](2026-10-10-hide-from-recents.md)。

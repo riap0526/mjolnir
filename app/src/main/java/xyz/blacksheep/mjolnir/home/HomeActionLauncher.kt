@@ -200,15 +200,13 @@ class HomeActionLauncher(private val context: Context) {
         return true
     }
 
-    private fun launchOnDisplay(isTop: Boolean, intent: Intent, hideFromRecents: Boolean = false): Boolean {
+    private fun launchOnDisplay(isTop: Boolean, intent: Intent): Boolean {
         return if (isTop) {
-            DualScreenLauncher.launchOnTop(context, intent, hideFromRecents)
+            DualScreenLauncher.launchOnTop(context, intent)
         } else {
-            DualScreenLauncher.launchOnBottom(context, intent, hideFromRecents)
+            DualScreenLauncher.launchOnBottom(context, intent)
         }
     }
-
-    private fun hideFromRecents(pkg: String?): Boolean = RecentsVisibility.shouldHide(prefs, pkg)
 
     private fun logLaunchResult(slot: String, pkg: String, launched: Boolean) {
         if (launched) {
@@ -263,7 +261,7 @@ class HomeActionLauncher(private val context: Context) {
 
                 if (launchIntent != null) {
                     try {
-                        val launched = DualScreenLauncher.launchOnTop(context, launchIntent, hideFromRecents(targetPkg))
+                        val launched = DualScreenLauncher.launchOnTop(context, launchIntent)
                         logLaunchResult("TOP", targetPkg, launched)
                     } catch (e: Exception) {
                         DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=TOP package=$targetPkg message=${e.message}", context)
@@ -304,7 +302,7 @@ class HomeActionLauncher(private val context: Context) {
 
                 if (launchIntent != null) {
                     try {
-                        val launched = DualScreenLauncher.launchOnBottom(context, launchIntent, hideFromRecents(targetPkg))
+                        val launched = DualScreenLauncher.launchOnBottom(context, launchIntent)
                         logLaunchResult("BOTTOM", targetPkg, launched)
                     } catch (e: Exception) {
                         DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=BOTTOM package=$targetPkg message=${e.message}", context)
@@ -392,7 +390,7 @@ class HomeActionLauncher(private val context: Context) {
 
         if (launchIntent != null) {
             try {
-                val launched = launchOnDisplay(focusTarget == FocusTarget.TOP, launchIntent, hideFromRecents(targetPkg))
+                val launched = launchOnDisplay(focusTarget == FocusTarget.TOP, launchIntent)
                 val event = if (launched) "FOCUS_TOP_APP_LAUNCH_SUCCESS" else "FOCUS_TOP_APP_LAUNCH_FAILED"
                 DiagnosticsLogger.logEvent(TAG, event, "target=$focusTarget package=$targetPkg", context)
             } catch (e: Exception) {
@@ -532,7 +530,7 @@ class HomeActionLauncher(private val context: Context) {
 
             if (launchIntent != null) {
                 try {
-                    val launched = DualScreenLauncher.launchOnTop(context, launchIntent, hideFromRecents(targetPkg))
+                    val launched = DualScreenLauncher.launchOnTop(context, launchIntent)
                     logLaunchResult("TOP", targetPkg, launched)
                 } catch (e: Exception) {
                     DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=TOP package=$targetPkg message=${e.message}", context)
@@ -563,7 +561,7 @@ class HomeActionLauncher(private val context: Context) {
 
             if (launchIntent != null) {
                 try {
-                    val launched = DualScreenLauncher.launchOnBottom(context, launchIntent, hideFromRecents(targetPkg))
+                    val launched = DualScreenLauncher.launchOnBottom(context, launchIntent)
                     logLaunchResult("BOTTOM", targetPkg, launched)
                 } catch (e: Exception) {
                     DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=BOTTOM package=$targetPkg message=${e.message}", context)

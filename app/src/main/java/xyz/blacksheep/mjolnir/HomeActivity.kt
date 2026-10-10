@@ -12,7 +12,6 @@ import android.text.TextUtils
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.content.edit
-import xyz.blacksheep.mjolnir.home.RecentsVisibility
 import xyz.blacksheep.mjolnir.onboarding.OnboardingActivity
 import xyz.blacksheep.mjolnir.model.MainScreen
 import xyz.blacksheep.mjolnir.launchers.resolveLaunchIntent
@@ -80,9 +79,9 @@ class HomeActivity : ComponentActivity() {
                  val launchIntent = targetPkg?.let { resolveLaunchIntent(this, it) }
                  if (launchIntent != null) {
                      val launched = if (mainScreen == MainScreen.TOP) {
-                         DualScreenLauncher.launchOnTop(this, launchIntent, RecentsVisibility.shouldHide(prefs, targetPkg))
+                         DualScreenLauncher.launchOnTop(this, launchIntent)
                      } else {
-                         DualScreenLauncher.launchOnBottom(this, launchIntent, RecentsVisibility.shouldHide(prefs, targetPkg))
+                         DualScreenLauncher.launchOnBottom(this, launchIntent)
                      }
                      DiagnosticsLogger.logEvent("HomeActivity", "LAUNCH_SINGLE", "package=$targetPkg mainScreen=$mainScreen launched=$launched", this)
                      prefs.edit { putInt(KEY_LAUNCH_FAILURE_COUNT, 0) }
@@ -96,11 +95,7 @@ class HomeActivity : ComponentActivity() {
                 val bottomIntent = resolveLaunchIntent(this, bottomAppPkg)
 
                 if (topIntent != null && bottomIntent != null) {
-                    val success = DualScreenLauncher.launchOnDualScreens(
-                        this, topIntent, bottomIntent, mainScreen,
-                        hideTopFromRecents = RecentsVisibility.shouldHide(prefs, topAppPkg),
-                        hideBottomFromRecents = RecentsVisibility.shouldHide(prefs, bottomAppPkg)
-                    )
+                    val success = DualScreenLauncher.launchOnDualScreens(this, topIntent, bottomIntent, mainScreen)
                     DiagnosticsLogger.logEvent("HomeActivity", "LAUNCH_BOTH", "mainScreen=$mainScreen success=$success", this)
                     if (success) {
                         prefs.edit { putInt(KEY_LAUNCH_FAILURE_COUNT, 0) }

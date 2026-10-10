@@ -4,16 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-# Mjolnir v0.2.9 - Hide from Recents (fork, testing)
+# Mjolnir v0.2.8a - Maintenance (fork)
 
-## Features
-- **Per-slot "Hide from Recents"** (adapted from [alexboydray](https://github.com/alexboydray)'s upstream PR [blacksheepmvp/mjolnir#40](https://github.com/blacksheepmvp/mjolnir/pull/40)): opt-in switches for the top and bottom apps in Home Launcher settings and onboarding. When on, Mjolnir launches that app with `FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS`. Off by default; default-home launches are unaffected.
-  - Unlike the upstream PR, the setting also applies to launches from `HomeActivity` (when Mjolnir is the default home), and it follows the app's package rather than the target display.
-  - Only takes effect when the launch creates a new task. A hidden app cannot be locked in Recents.
+Same app as v0.2.8; no behavior changes.
 
-## Other
 - Removed the Ko-fi donation button from the What's New dialog.
-- About dialog links to this fork and credits the original project.
+- About dialog links to this fork and credits the original project by blacksheepmvp.
+- README: fork changes, credits and disclaimer.
+
+`versionCode` is 24 so it installs over the unreleased 0.2.9 test builds (22, 23). The "Hide from Recents" feature tested in those builds was dropped: on the AYN Thor the top-screen app stays in Recents whenever it is the most recent task on the default display, so it only ever hid the bottom app.
 
 ---
 

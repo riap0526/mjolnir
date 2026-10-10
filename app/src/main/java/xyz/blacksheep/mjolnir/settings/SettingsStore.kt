@@ -47,8 +47,6 @@ object SettingsStore {
         KEY_DSS_SHARE_AFTER_CAPTURE,
         KEY_AUTO_BOOT_BOTH_HOME,
         KEY_BOTH_AUTO_NOTHING_TO_HOME,
-        KEY_HIDE_TOP_APP_FROM_RECENTS,
-        KEY_HIDE_BOTTOM_APP_FROM_RECENTS,
         KEY_TOP_BOTTOM_LAUNCH_DELAY_MS
     )
 
@@ -92,8 +90,6 @@ object SettingsStore {
         KEY_LAUNCH_FAILURE_COUNT to KeyType.INT,
         KEY_AUTO_BOOT_BOTH_HOME to KeyType.BOOLEAN,
         KEY_BOTH_AUTO_NOTHING_TO_HOME to KeyType.BOOLEAN,
-        KEY_HIDE_TOP_APP_FROM_RECENTS to KeyType.BOOLEAN,
-        KEY_HIDE_BOTTOM_APP_FROM_RECENTS to KeyType.BOOLEAN,
         KEY_TOP_BOTTOM_LAUNCH_DELAY_MS to KeyType.INT,
         KEY_ENABLE_FOCUS_LOCK_WORKAROUND to KeyType.BOOLEAN,
         KEY_DSS_PROJECTION_DATA to KeyType.STRING,
@@ -133,8 +129,6 @@ object SettingsStore {
         KEY_DSS_SHARE_AFTER_CAPTURE to "DSS_SHARE_AFTER_CAPTURE: true | false.",
         KEY_AUTO_BOOT_BOTH_HOME to "START_ON_BOOT_AUTO (Advanced only): true = BOTH: Auto, false = BOTH: Home.",
         KEY_BOTH_AUTO_NOTHING_TO_HOME to "BOTH_AUTO_NOTHING_TO_HOME: true = empty slot launches Home, false = empty slot does nothing.",
-        KEY_HIDE_TOP_APP_FROM_RECENTS to "hide_top_app_from_recents: true | false. Keeps the top-screen app out of Recents.",
-        KEY_HIDE_BOTTOM_APP_FROM_RECENTS to "hide_bottom_app_from_recents: true | false. Keeps the bottom-screen app out of Recents.",
         KEY_TOP_BOTTOM_LAUNCH_DELAY_MS to "TOP_BOTTOM_LAUNCH_DELAY_MS: integer milliseconds (0-500). Delay between sequenced top/bottom launches."
     )
 
