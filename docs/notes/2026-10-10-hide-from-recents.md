@@ -19,3 +19,9 @@
 ## 附帶修正的推測
 
 週 log 中 Mjolnir 三次 `SIGNALED`，原推測為「全部清除」。這次測試顯示全部清除不一定會殺掉不在清單中的 App，該推測不確定，之後若再發生需重新判斷。
+
+## 發佈結果
+
+- **v0.2.8a 已發佈**：<https://github.com/riap0526/mjolnir/releases/tag/v0.2.8a>
+- APK：`mjolnir-0.2.8a.apk`（簽章版，約 14.2 MB），`versionCode` 24。
+- 經 [PR #2](https://github.com/riap0526/mjolnir/pull/2) 合併進 `main`（`00479f3`），再從 `main` 手動觸發發佈（run 38036494048）；tag `v0.2.8a` 指向 `00479f3`。
