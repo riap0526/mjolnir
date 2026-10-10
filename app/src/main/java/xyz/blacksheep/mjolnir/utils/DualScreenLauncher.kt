@@ -53,6 +53,7 @@ object DualScreenLauncher {
                     setLaunchDisplayId(topDisplay.displayId)
                 }
             }
+            logLaunchIntent(context, topDisplay.displayId, intent)
             context.startActivity(intent, options.toBundle())
             true
         } catch (e: Exception) {
@@ -93,12 +94,24 @@ object DualScreenLauncher {
                     setLaunchDisplayId(bottomDisplay.displayId)
                 }
             }
+            logLaunchIntent(context, bottomDisplay.displayId, intent)
             context.startActivity(intent, options.toBundle())
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error launching on bottom screen: ${e.message}", e)
             false
         }
+    }
+
+    private fun logLaunchIntent(context: Context, displayId: Int, intent: Intent) {
+        val hidden = (intent.flags and Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0
+        DiagnosticsLogger.logEvent(
+            TAG,
+            "LAUNCH_INTENT",
+            "display=$displayId package=${intent.`package` ?: intent.component?.packageName} " +
+                "flags=0x${Integer.toHexString(intent.flags)} hideFromRecents=$hidden",
+            context
+        )
     }
 
     /**
