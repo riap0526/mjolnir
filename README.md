@@ -17,7 +17,7 @@ Prefer mixing single-screen activities? **BOTH: Auto** and **FOCUS: Auto** are h
 Mjolnir gives you **precise control** over what happens when you press the Home button — routing frontends or launchers to the top display, bottom display, or both.  
 Originally designed for the **AYN Thor**, it also works on single-screen devices as a powerful Home-button automation tool.
 
-**Device support note (0.2.7):** AYN Thor is the primary supported target. RG-DS support is planned for 0.2.8 and is not officially supported in 0.2.7.
+**Device support note (0.2.8):** AYN Thor is the primary supported target. RG-DS is not officially supported yet.
 
 ---
 

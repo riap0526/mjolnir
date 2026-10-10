@@ -1,0 +1,18 @@
+# Mjolnir v0.2.8 - Stability Update
+
+First release of the maintained fork (github.com/riap0526/mjolnir).
+
+## Stability
+- Settings and gesture presets survive crashes and sudden power loss; a corrupted file is restored from its backup instead of resetting your setup.
+- Top/bottom apps launch even if they are hidden in the blacklist or by "Show all apps", so a launch failure can no longer wipe your configuration.
+- Home presses respond faster: no more scanning every installed app on each press.
+- Fixed a preset named "custom" multiplying into dozens of untitled files.
+- Fixed a 10-second period after a restart where Home presses were ignored.
+- Lower background memory use: app icons load only while Mjolnir's screens are open.
+
+## Home routing and gestures
+- FOCUS: Home opens Home on the screen that has focus (thanks to ghgoodreau).
+- Long press no longer triggers a second gesture when released.
+
+## Diagnostics
+- The diagnostics log now records why Mjolnir last stopped, settings recovery, real launch results and when the SafetyNet screen appears.

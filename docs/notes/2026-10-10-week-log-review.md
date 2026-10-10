@@ -110,3 +110,21 @@ log 範圍：2026-10-02 20:25 到 10-10 12:47，共 4,279 行。10-03 20:09 安�
 1. 第一批做 A 和 B（低風險，可以一起出版），出版後用一週 log 比較記憶體與重啟情況。
 2. C 先不動程式，請使用者查 Thor 有沒有背景白名單設定。
 3. 可以考慮把目前版本打 tag 發佈為正式版（例如 `v0.2.8`）。
+
+---
+
+## 決定與執行結果（2026-10-10）
+
+| 項目 | 決定 | 結果 |
+|---|---|---|
+| A. 圖示改為需要時才載入 | 做 | `987fc51`：移出 `MjolnirApp.onCreate`，改由 `MainActivity`、`OnboardingActivity` 在背景預先載入；`onTrimMemory`（UI_HIDDEN 以上）清空快取 |
+| B. 開機前的結束紀錄 | 做 | `987fc51`：`PREVIOUS_PROCESS_EXIT` 新增 `beforeBoot` 欄位 |
+| C. 抵抗「全部清除」 | 不做 | 使用者已把 Mjolnir 設為不受電池最佳化限制，先觀察下一份 log 中 `SIGNALED` 的次數 |
+
+A、B 與先前所有修正一起發佈為 **v0.2.8**（第一個正式版，`versionCode` 21）。
+
+**下一份 log 要看**：
+- `PREVIOUS_PROCESS_EXIT` 的 `pssKb` 是否低於改版前的 55 到 74 MB。
+- 一般啟動是否不再出現 `ICON_PREWARM_START`；只有打開 Mjolnir 畫面時才出現，並帶有 `source=MainActivity` 或 `source=Onboarding`。
+- `SIGNALED` 是否因為電池最佳化設定而減少。
+

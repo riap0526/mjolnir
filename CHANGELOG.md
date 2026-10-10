@@ -4,28 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-# Unreleased (fork)
+# Mjolnir v0.2.8 - Stability Update (fork)
+
+First release of the maintained fork ([riap0526/mjolnir](https://github.com/riap0526/mjolnir)). It is signed with a different key than the original releases: back up `/Android/data/xyz.blacksheep.mjolnir/` and uninstall the original before installing (see `docs/BUILDING.md`).
 
 ## Stability
 - **Crash-safe settings**: Config and gesture preset files are now written durably with a backup copy. A file corrupted by an unclean shutdown is recovered from the backup instead of silently resetting settings; stale legacy preferences no longer override current values.
 - **Reliable launches**: Configured top/bottom apps are launched by package name. Hiding an app in the blacklist or toggling "Show all apps" no longer makes launches fail (which could wipe the configuration after three failures), and Home presses no longer scan every installed app.
 - **Crash guards**: Fixed a thread-safety bug in the icon cache, and invalid `MAIN_SCREEN` or legacy gesture values no longer crash Mjolnir.
 - Home presses no longer restart the persistent service each time.
+- **Gesture presets**: a preset named "custom" no longer multiplies into dozens of `untitled-N.cfg` files (and no longer has its actions replaced by defaults).
+- **Lighter background footprint**: app icons are loaded only when a Mjolnir screen opens and released when it closes, instead of on every process start.
 
 ## Home routing and gestures (merged from [ghgoodreau/mjolnir](https://github.com/ghgoodreau/mjolnir), `fix/focused-home-routing`)
 - **FOCUS: Home** now opens the default home on the focused display instead of letting the system pick one.
 - The vendor `focus_change` value is only trusted when it is a real display id (on the Thor it never is).
 - Home gestures ignore key repeats and unmatched events, and the release after a long press no longer triggers a second gesture evaluation.
+- Fixed a 10-second freeze of Home handling after Mjolnir restarts (a window scan during accessibility startup, introduced by the merge).
 
 ## Diagnostics
 - Logs why the previous Mjolnir process ended (low memory, crash, task cleaner, ...), settings recovery, Home activity decisions, real launch results, and when the SafetyNet screen becomes visible.
 - Log lines are written in order with accurate timestamps.
+- The previous-exit record is marked `beforeBoot` when it predates the current boot.
 
 ## Build
 - Release signing via `keystore.properties` or environment variables, plus an SDK setup script. See `docs/BUILDING.md`.
 - GitHub Actions builds debug and signed release APKs; `v*` tags publish a GitHub Release.
 
-Details: `docs/notes/2026-10-02-stability-round-1.md`.
+Details: `docs/notes/2026-10-02-stability-round-1.md`, `docs/notes/2026-10-10-week-log-review.md`.
 
 ---
 

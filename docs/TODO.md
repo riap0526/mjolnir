@@ -17,7 +17,7 @@
 ### 2. Thor「全部清除」會殺掉 Mjolnir 行程
 - **現象**：Mjolnir 不出現在最近使用清單，使用者無法上鎖。10-03、10-04、10-08 三次被 `SIGNALED`（SIGKILL）結束，之前 5 到 15 秒都出現最近使用的應用程式畫面，比較可能是「全部清除」造成的（修正了 10-03 「喚醒時被殺」的推測）。
 - **影響**：每週約 3 次。系統 2 到 11 秒內重新拉起 Mjolnir，期間 Home 鍵由系統交給 HomeActivity 處理。
-- **評估結論（10-10）**：目前不改程式。先請使用者查 Thor 有沒有背景白名單設定；必要時再把「顯示在最近使用清單」做成預設關閉的實驗開關。獨立 `:keepalive` 行程無效（被殺的是承載無障礙服務的主行程），不採用。詳見 [`notes/2026-10-10-week-log-review.md`](notes/2026-10-10-week-log-review.md) C 節。
+- **評估結論（10-10）**：目前不改程式。使用者已於 10-10 把 Mjolnir 設為不受電池最佳化限制，下一份 log 觀察 `SIGNALED` 是否減少。先請使用者查 Thor 有沒有背景白名單設定；必要時再把「顯示在最近使用清單」做成預設關閉的實驗開關。獨立 `:keepalive` 行程無效（被殺的是承載無障礙服務的主行程），不採用。詳見 [`notes/2026-10-10-week-log-review.md`](notes/2026-10-10-week-log-review.md) C 節。
 
 ### 3. Android 14 以上的前景服務類型錯誤 🧪
 - `KeepAliveService` 宣告 `connectedDevice` 類型但沒有對應權限，`startForeground` 又傳入類型 0，lint 警告被 `tools:ignore` 壓掉。Android 14 以上很可能直接被系統擋下或殺掉。
@@ -36,10 +36,8 @@
 - 合併 ghgoodreau 的修正後，「FOCUS: Home」不再直接送系統 Home 鍵，而是依焦點把桌面開在對應螢幕（透過 `FocusHackHelper` 搶焦點後再送 Home）。焦點無法判斷時才退回舊行為。
 - **要驗證**：使用 FOCUS: Home 時，上下螢幕各試一次，確認桌面出現在正確的螢幕，且沒有閃爍或延遲異常。也會一併受到第 14 項的影響。
 
-### 7. 圖示改為需要時才載入（已評估，建議做）
-- 每次行程啟動都會預先載入所有 App 圖示，但 Home 鍵路徑完全用不到；記憶體回收風暴中 30 次啟動只有 12 次載入完成。
-- **做法**：移出 `MjolnirApp.onCreate`，改在 `MainActivity`、`OnboardingActivity` 開啟時預先載入；選擇性在 `onTrimMemory` 清空快取。
-- **驗證**：比較改版前後 `PREVIOUS_PROCESS_EXIT` 的 `pssKb`（目前基準 55 到 74 MB）。詳見 10-10 評估 A 節。
+### 7. ~~圖示改為需要時才載入~~ ✅ v0.2.8 完成（`987fc51`）
+- 待驗證：比較改版前後 `PREVIOUS_PROCESS_EXIT` 的 `pssKb`（改版前基準 55 到 74 MB）。
 
 ### 8. 記憶體回收風暴（觀察中）
 - 10-04 兩次在 `com.droiddeck.launcher` 執行時發生，Mjolnir 在 35 秒內被殺 16 次（`LOW_MEMORY`）。ES-DE 被重設很可能是同一原因。Mjolnir 能做的只有降低自身記憶體（第 7 項）。
@@ -64,7 +62,7 @@
 21. **版本控制與 manifest**：`.idea/`、`.kotlin/` 已被 track，應 `git rm --cached`；`RECEIVE_BOOT_COMPLETED`、`WRITE_EXTERNAL_STORAGE` 沒有用到。
 22. **死碼與過時文件**：`MjolnirApp.isKeepAliveProcess()`、`NotificationUtil`（讀一個從未寫入的全域狀態）、`FocusLockOverlayWorkaround` 的文件描述與實作不符。
 23. **診斷 log 量**：開啟時每個 accessibility event 都寫一行（使用者 log 一個月約 2.7 萬行），合併後每次 Home 鍵事件又多一行 `HOME_KEY_EVENT`。可考慮分級或取樣。
-24. **開機後顯示舊的「上次結束原因」（已評估，建議做）**：關機不會產生結束紀錄，開機後拿到的是開機前的舊資料。改為比對開機時間並標示 `beforeBoot`。詳見 10-10 評估 B 節。
+24. ~~**開機後顯示舊的「上次結束原因」**~~ ✅ v0.2.8 完成（`987fc51`）：開機前的紀錄會標示 `beforeBoot=true`。
 25. **Thor 的 `focus_change` 系統設定意義不明**：值是 188、215、790 這類數字，不是螢幕 ID。目前的處理是驗證不通過就不採用、改為掃描視窗。如果能查出它代表什麼，也許能更快判斷焦點，但優先度低。
 
 ## 工程基礎

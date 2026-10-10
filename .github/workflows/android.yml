@@ -87,6 +87,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Release notes come from the in-app changelog of the tagged version, e.g. v0.2.8.txt.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: mjolnir-release-${{ github.sha }}
@@ -95,4 +98,5 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*.apk
-          generate_release_notes: true
+          body_path: app/src/main/assets/changelogs/${{ github.ref_name }}.txt
+          fail_on_unmatched_files: true
