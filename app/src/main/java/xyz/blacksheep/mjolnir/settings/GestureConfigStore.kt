@@ -5,7 +5,9 @@ import android.util.Log
 import android.view.ViewConfiguration
 import xyz.blacksheep.mjolnir.home.Action
 import xyz.blacksheep.mjolnir.KEY_ACTIVE_GESTURE_CONFIG
+import xyz.blacksheep.mjolnir.KEY_LEGACY_CUSTOM_PRESET_MIGRATED
 import xyz.blacksheep.mjolnir.settings.settingsPrefs
+import xyz.blacksheep.mjolnir.utils.DurableFiles
 import java.io.File
 
 object GestureConfigStore {
@@ -39,18 +41,7 @@ object GestureConfigStore {
         val dir = gestureDir(context)
         if (!dir.exists()) dir.mkdirs()
 
-        val legacyCustom = File(dir, "custom.cfg")
-        if (legacyCustom.exists()) {
-            val untitledBase = nextUntitledBase(context)
-            val renamedCustom = File(dir, "$untitledBase.cfg")
-            if (!renamedCustom.exists()) {
-                legacyCustom.renameTo(renamedCustom)
-                val loaded = readConfig(renamedCustom)
-                if (loaded != null) {
-                    writeConfig(context, loaded.copy(fileName = renamedCustom.name, name = untitledBase))
-                }
-            }
-        }
+        migrateLegacyCustomPresetOnce(context, dir)
 
         val existing = dir.listFiles { file -> file.isFile && file.extension == "cfg" }.orEmpty()
         if (existing.isEmpty()) {
@@ -114,6 +105,38 @@ object GestureConfigStore {
         }
     }
 
+    /**
+     * Renames the pre-0.2.7 `custom.cfg` preset to `untitled-N.cfg`, exactly once per install.
+     *
+     * This used to run on every load. A preset the user named "custom" (saved as `custom.cfg`)
+     * was then renamed away each time, the still-active `custom.cfg` was recreated from fallback
+     * defaults, and the next load renamed that too: dozens of untitled files, and the user's
+     * actions silently replaced by defaults.
+     */
+    private fun migrateLegacyCustomPresetOnce(context: Context, dir: File) {
+        val prefs = context.settingsPrefs()
+        if (prefs.getBoolean(KEY_LEGACY_CUSTOM_PRESET_MIGRATED, false)) return
+
+        val legacyCustom = File(dir, "custom.cfg")
+        if (legacyCustom.exists()) {
+            val untitledBase = nextUntitledBase(context)
+            val renamedCustom = File(dir, "$untitledBase.cfg")
+            if (!renamedCustom.exists() && legacyCustom.renameTo(renamedCustom)) {
+                DurableFiles.backupOf(legacyCustom).delete()
+                val loaded = readConfig(renamedCustom)
+                if (loaded != null) {
+                    writeConfig(context, loaded.copy(fileName = renamedCustom.name, name = untitledBase))
+                }
+                // Keep the renamed preset active; otherwise loading "custom.cfg" recreates it.
+                if (prefs.getString(KEY_ACTIVE_GESTURE_CONFIG, null) == legacyCustom.name) {
+                    prefs.edit().putString(KEY_ACTIVE_GESTURE_CONFIG, renamedCustom.name).apply()
+                    cachedActive = null
+                }
+            }
+        }
+        prefs.edit().putBoolean(KEY_LEGACY_CUSTOM_PRESET_MIGRATED, true).apply()
+    }
+
     fun getActiveConfig(context: Context, forceRefresh: Boolean = false): GestureConfig {
         ensureDefaults(context)
         val prefs = context.settingsPrefs()
@@ -162,10 +185,10 @@ object GestureConfigStore {
         val config = GestureConfig(
             fileName = "$untitledBase.cfg",
             name = untitledBase,
-            single = Action.valueOf(prefs.getString(xyz.blacksheep.mjolnir.KEY_SINGLE_HOME_ACTION, Action.FOCUS_AUTO.name)!!),
-            double = Action.valueOf(prefs.getString(xyz.blacksheep.mjolnir.KEY_DOUBLE_HOME_ACTION, Action.BOTH_HOME.name)!!),
-            triple = Action.valueOf(prefs.getString(xyz.blacksheep.mjolnir.KEY_TRIPLE_HOME_ACTION, Action.APP_SWITCH.name)!!),
-            long = Action.valueOf(prefs.getString(xyz.blacksheep.mjolnir.KEY_LONG_HOME_ACTION, Action.DEFAULT_HOME.name)!!),
+            single = parseAction(prefs.getString(xyz.blacksheep.mjolnir.KEY_SINGLE_HOME_ACTION, null), Action.FOCUS_AUTO),
+            double = parseAction(prefs.getString(xyz.blacksheep.mjolnir.KEY_DOUBLE_HOME_ACTION, null), Action.BOTH_HOME),
+            triple = parseAction(prefs.getString(xyz.blacksheep.mjolnir.KEY_TRIPLE_HOME_ACTION, null), Action.APP_SWITCH),
+            long = parseAction(prefs.getString(xyz.blacksheep.mjolnir.KEY_LONG_HOME_ACTION, null), Action.DEFAULT_HOME),
             longPressDelayMs = ViewConfiguration.getLongPressTimeout()
         )
         writeConfig(context, config)
@@ -231,6 +254,7 @@ object GestureConfigStore {
 
         if (oldFile.exists() && oldFile.name != newFile.name) {
             oldFile.renameTo(newFile)
+            DurableFiles.backupOf(oldFile).delete()
         }
 
         val updated = config.copy(fileName = newFile.name, name = displayName)
@@ -250,7 +274,7 @@ object GestureConfigStore {
         if (isReserved(fileName)) return false
         val dir = gestureDir(context)
         val target = File(dir, File(fileName).name)
-        val deleted = if (target.exists()) target.delete() else false
+        val deleted = if (target.exists()) DurableFiles.delete(target) else false
 
         val prefs = context.settingsPrefs()
         val activeFile = prefs.getString(KEY_ACTIVE_GESTURE_CONFIG, DEFAULT_ACTIVE_FILE)
@@ -303,7 +327,8 @@ object GestureConfigStore {
 
     private fun readConfig(file: File): GestureConfig? {
         return try {
-            val lines = file.readLines()
+            val text = DurableFiles.read(file, ::isValidConfigText).text ?: return null
+            val lines = text.lines()
             val map = mutableMapOf<String, String>()
             for (line in lines) {
                 val trimmed = line.trim()
@@ -337,6 +362,13 @@ object GestureConfigStore {
             null
         }
     }
+
+    // writeConfig always emits the action keys; a file with none of them is truncated or corrupt.
+    private fun isValidConfigText(text: String): Boolean =
+        text.lineSequence().any { line ->
+            val key = line.substringBefore('=', "").trim().lowercase()
+            key == "single" || key == "double" || key == "triple" || key == "long"
+        }
 
     private fun parseAction(value: String?, fallback: Action): Action {
         if (value.isNullOrBlank()) return fallback
@@ -387,11 +419,7 @@ object GestureConfigStore {
     }
 
     private fun atomicWrite(file: File, content: String) {
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(content)
-        if (!tmp.renameTo(file)) {
-            file.writeText(content)
-        }
+        DurableFiles.write(file, content)
     }
 
     private fun nextAvailableFileName(context: Context, baseName: String): String {

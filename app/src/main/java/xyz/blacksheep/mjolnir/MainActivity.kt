@@ -82,6 +82,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.launch
+import xyz.blacksheep.mjolnir.utils.AppQueryHelper
 import xyz.blacksheep.mjolnir.onboarding.OnboardingActivity
 import xyz.blacksheep.mjolnir.services.KeepAliveService
 import xyz.blacksheep.mjolnir.settings.AboutDialog
@@ -104,6 +105,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         excludeTaskFromRecents()
+        AppQueryHelper.prewarmInBackground(this, source = "MainActivity")
 
         installSplashScreen()
 
@@ -181,7 +183,7 @@ class MainActivity : ComponentActivity() {
                 var devMode by rememberSaveable { mutableStateOf(prefs.getBoolean(KEY_DEV_MODE, false)) }
                 var showAllApps by rememberSaveable { mutableStateOf(prefs.getBoolean(KEY_SHOW_ALL_APPS, false)) }
                 val initialMainScreenName = prefs.getString(KEY_MAIN_SCREEN, MainScreen.TOP.name)
-                var mainScreen by rememberSaveable { mutableStateOf(MainScreen.valueOf(initialMainScreenName ?: MainScreen.TOP.name)) }
+                var mainScreen by rememberSaveable { mutableStateOf(MainScreen.fromPref(initialMainScreenName)) }
 
                 val context = this@MainActivity
                 var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context, HomeKeyInterceptorService::class.java)) }

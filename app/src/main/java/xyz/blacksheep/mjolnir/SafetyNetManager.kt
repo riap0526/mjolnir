@@ -11,6 +11,7 @@ import android.os.Build
 import android.view.Display
 import android.util.Log
 import xyz.blacksheep.mjolnir.settings.settingsPrefs
+import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
 
 object SafetyNetManager {
     private const val TAG = "SafetyNetManager"
@@ -43,9 +44,13 @@ object SafetyNetManager {
         displays.forEach { targetDisplayIds.add(it.displayId) }
         val displaySummary = displays.joinToString { "${it.displayId}:${it.name}" }
         Log.d(TAG, "DisplayManager reports: [$displaySummary]; targetIds=$targetDisplayIds")
+        DiagnosticsLogger.logEvent("SafetyNet", "ENSURE_START", "displays=[$displaySummary]", context)
 
         for (displayId in targetDisplayIds) {
-            if (hasSafetyNetTask(activityManager, displayId)) continue
+            if (hasSafetyNetTask(activityManager, displayId)) {
+                DiagnosticsLogger.logEvent("SafetyNet", "ALREADY_PRESENT", "displayId=$displayId", context)
+                continue
+            }
 
             val intent = Intent(context, SafetyNetActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -62,6 +67,7 @@ object SafetyNetManager {
                 context.startActivity(intent)
             }
             Log.d(TAG, "Requested SafetyNetActivity for displayId=$displayId data=${intent.data}")
+            DiagnosticsLogger.logEvent("SafetyNet", "LAUNCH_REQUESTED", "displayId=$displayId reason=missing", context)
         }
 
         clearPending(context)
@@ -90,6 +96,7 @@ object SafetyNetManager {
                 context.startActivity(intent)
             }
             Log.d(TAG, "Bring SafetyNetActivity to front for displayId=$displayId data=${intent.data}")
+            DiagnosticsLogger.logEvent("SafetyNet", "LAUNCH_REQUESTED", "displayId=$displayId reason=bring_to_front", context)
         }
     }
 
@@ -115,6 +122,7 @@ object SafetyNetManager {
                 context.startActivity(intent)
             }
             Log.d(TAG, "Force SafetyNetActivity to front for displayId=$displayId data=${intent.data}")
+            DiagnosticsLogger.logEvent("SafetyNet", "LAUNCH_REQUESTED", "displayId=$displayId reason=force_to_front", context)
         }
     }
 

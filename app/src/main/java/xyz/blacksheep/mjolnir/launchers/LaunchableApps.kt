@@ -56,3 +56,28 @@ fun getLaunchableApps(context: Context, showAll: Boolean): List<LauncherApp> {
     return listOf(nothingOption) + apps
     // --- MANUAL CHANGE END ---
 }
+
+/**
+ * Builds the launch intent for one configured package without querying every installed app.
+ *
+ * Unlike [getLaunchableApps], this ignores the blacklist and the "Show all apps" filter: those only
+ * decide what the picker offers, and must not make an already-configured slot fail to launch.
+ *
+ * @return An intent shaped like the ones [getLaunchableApps] builds, or `null` if the package is
+ * empty, is Mjolnir itself, is not installed, or has no launchable activity.
+ */
+fun resolveLaunchIntent(context: Context, packageName: String): Intent? {
+    if (packageName.isBlank() || packageName == "NOTHING" || packageName == context.packageName) return null
+    val pm = context.packageManager
+
+    pm.getLaunchIntentForPackage(packageName)?.let {
+        return it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    val fallback = Intent(Intent.ACTION_MAIN).apply {
+        addCategory(Intent.CATEGORY_LAUNCHER)
+        setPackage(packageName)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    return if (pm.resolveActivity(fallback, 0) != null) fallback else null
+}

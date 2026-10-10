@@ -20,11 +20,10 @@ import xyz.blacksheep.mjolnir.DEFAULT_TOP_BOTTOM_LAUNCH_DELAY_MS
 import xyz.blacksheep.mjolnir.KEY_BOTTOM_APP
 import xyz.blacksheep.mjolnir.KEY_BOTH_AUTO_NOTHING_TO_HOME
 import xyz.blacksheep.mjolnir.KEY_MAIN_SCREEN
-import xyz.blacksheep.mjolnir.KEY_SHOW_ALL_APPS
 import xyz.blacksheep.mjolnir.KEY_TOP_APP
 import xyz.blacksheep.mjolnir.KEY_TOP_BOTTOM_LAUNCH_DELAY_MS
 import xyz.blacksheep.mjolnir.model.MainScreen
-import xyz.blacksheep.mjolnir.launchers.getLaunchableApps
+import xyz.blacksheep.mjolnir.launchers.resolveLaunchIntent
 import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
 import xyz.blacksheep.mjolnir.utils.DualScreenLauncher
 import xyz.blacksheep.mjolnir.utils.FocusHackHelper
@@ -61,7 +60,6 @@ class HomeActionLauncher(private val context: Context) {
         private val TRACE_ID = AtomicLong(0)
     }
 
-    private enum class FocusTarget { TOP, BOTTOM }
 
     private fun nextTraceId(): Long = TRACE_ID.incrementAndGet()
 
@@ -135,11 +133,7 @@ class HomeActionLauncher(private val context: Context) {
         val cachedDisplayId = HomeKeyInterceptorService.lastFocusedDisplayId
         if (cachedDisplayId != null) {
             val (topId, bottomId) = resolveDisplayIds()
-            val target = when (cachedDisplayId) {
-                topId -> FocusTarget.TOP
-                bottomId -> FocusTarget.BOTTOM
-                else -> null
-            }
+            val target = resolveFocusTarget(cachedDisplayId, topId, bottomId)
             DiagnosticsLogger.logEvent(TAG, "FOCUS_CACHE_HIT", "cachedDisplayId=$cachedDisplayId target=$target", context)
             if (target != null) return target
             DiagnosticsLogger.logEvent(TAG, "FOCUS_CACHE_MISS", "cachedDisplayId=$cachedDisplayId topId=$topId bottomId=$bottomId", context)
@@ -149,11 +143,7 @@ class HomeActionLauncher(private val context: Context) {
 
         val focusedDisplayId = resolveFocusedDisplayId() ?: return null
         val (topId, bottomId) = resolveDisplayIds()
-        val target = when (focusedDisplayId) {
-            topId -> FocusTarget.TOP
-            bottomId -> FocusTarget.BOTTOM
-            else -> null
-        }
+        val target = resolveFocusTarget(focusedDisplayId, topId, bottomId)
         DiagnosticsLogger.logEvent(TAG, "FOCUS_TARGET_RESOLVED", "focusedDisplayId=$focusedDisplayId target=$target", context)
         return target
     }
@@ -194,9 +184,7 @@ class HomeActionLauncher(private val context: Context) {
         return when {
             topAppPkg == null && bottomAppPkg != null -> MainScreen.BOTTOM
             bottomAppPkg == null && topAppPkg != null -> MainScreen.TOP
-            else -> MainScreen.valueOf(
-                prefs.getString(KEY_MAIN_SCREEN, MainScreen.TOP.name) ?: MainScreen.TOP.name
-            )
+            else -> MainScreen.fromPref(prefs.getString(KEY_MAIN_SCREEN, null))
         }
     }
 
@@ -212,11 +200,19 @@ class HomeActionLauncher(private val context: Context) {
         return true
     }
 
-    private fun launchOnDisplay(isTop: Boolean, intent: Intent) {
-        if (isTop) {
+    private fun launchOnDisplay(isTop: Boolean, intent: Intent): Boolean {
+        return if (isTop) {
             DualScreenLauncher.launchOnTop(context, intent)
         } else {
             DualScreenLauncher.launchOnBottom(context, intent)
+        }
+    }
+
+    private fun logLaunchResult(slot: String, pkg: String, launched: Boolean) {
+        if (launched) {
+            DiagnosticsLogger.logEvent("Launcher", "LAUNCH_SUCCESS", "slot=$slot package=$pkg", context)
+        } else {
+            DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=$slot package=$pkg message=startActivity failed", context)
         }
     }
 
@@ -261,14 +257,12 @@ class HomeActionLauncher(private val context: Context) {
                 launchDefaultHomeOnTop()
                 if (!isManualSequence) return
             } else {
-                val showAllApps = prefs.getBoolean(KEY_SHOW_ALL_APPS, false)
-                val launcherApps = getLaunchableApps(context, showAllApps)
-                val appToLaunch = launcherApps.find { it.packageName == targetPkg }
+                val launchIntent = resolveLaunchIntent(context, targetPkg)
 
-                if (appToLaunch != null) {
+                if (launchIntent != null) {
                     try {
-                        DualScreenLauncher.launchOnTop(context, appToLaunch.launchIntent)
-                        DiagnosticsLogger.logEvent("Launcher", "LAUNCH_SUCCESS", "slot=TOP package=$targetPkg", context)
+                        val launched = DualScreenLauncher.launchOnTop(context, launchIntent)
+                        logLaunchResult("TOP", targetPkg, launched)
                     } catch (e: Exception) {
                         DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=TOP package=$targetPkg message=${e.message}", context)
                     }
@@ -304,14 +298,12 @@ class HomeActionLauncher(private val context: Context) {
                 launchDefaultHomeOnBottom()
                 if (!isManualSequence) return
             } else {
-                val showAllApps = prefs.getBoolean(KEY_SHOW_ALL_APPS, false)
-                val launcherApps = getLaunchableApps(context, showAllApps)
-                val appToLaunch = launcherApps.find { it.packageName == targetPkg }
+                val launchIntent = resolveLaunchIntent(context, targetPkg)
 
-                if (appToLaunch != null) {
+                if (launchIntent != null) {
                     try {
-                        DualScreenLauncher.launchOnBottom(context, appToLaunch.launchIntent)
-                        DiagnosticsLogger.logEvent("Launcher", "LAUNCH_SUCCESS", "slot=BOTTOM package=$targetPkg", context)
+                        val launched = DualScreenLauncher.launchOnBottom(context, launchIntent)
+                        logLaunchResult("BOTTOM", targetPkg, launched)
                     } catch (e: Exception) {
                         DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=BOTTOM package=$targetPkg message=${e.message}", context)
                     }
@@ -394,14 +386,13 @@ class HomeActionLauncher(private val context: Context) {
             return
         }
 
-        val showAllApps = prefs.getBoolean(KEY_SHOW_ALL_APPS, false)
-        val launcherApps = getLaunchableApps(context, showAllApps)
-        val appToLaunch = launcherApps.find { it.packageName == targetPkg }
+        val launchIntent = resolveLaunchIntent(context, targetPkg)
 
-        if (appToLaunch != null) {
+        if (launchIntent != null) {
             try {
-                launchOnDisplay(focusTarget == FocusTarget.TOP, appToLaunch.launchIntent)
-                DiagnosticsLogger.logEvent(TAG, "FOCUS_TOP_APP_LAUNCH_SUCCESS", "target=$focusTarget package=$targetPkg", context)
+                val launched = launchOnDisplay(focusTarget == FocusTarget.TOP, launchIntent)
+                val event = if (launched) "FOCUS_TOP_APP_LAUNCH_SUCCESS" else "FOCUS_TOP_APP_LAUNCH_FAILED"
+                DiagnosticsLogger.logEvent(TAG, event, "target=$focusTarget package=$targetPkg", context)
             } catch (e: Exception) {
                 DiagnosticsLogger.logEvent(TAG, "FOCUS_TOP_APP_LAUNCH_FAILED", "target=$focusTarget package=$targetPkg error=${e.message}", context)
             }
@@ -535,14 +526,12 @@ class HomeActionLauncher(private val context: Context) {
             launchDefaultHomeOnDisplayAwait(isTop = true)
             if (!isManualSequence) return
         } else {
-            val showAllApps = prefs.getBoolean(KEY_SHOW_ALL_APPS, false)
-            val launcherApps = getLaunchableApps(context, showAllApps)
-            val appToLaunch = launcherApps.find { it.packageName == targetPkg }
+            val launchIntent = resolveLaunchIntent(context, targetPkg)
 
-            if (appToLaunch != null) {
+            if (launchIntent != null) {
                 try {
-                    DualScreenLauncher.launchOnTop(context, appToLaunch.launchIntent)
-                    DiagnosticsLogger.logEvent("Launcher", "LAUNCH_SUCCESS", "slot=TOP package=$targetPkg", context)
+                    val launched = DualScreenLauncher.launchOnTop(context, launchIntent)
+                    logLaunchResult("TOP", targetPkg, launched)
                 } catch (e: Exception) {
                     DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=TOP package=$targetPkg message=${e.message}", context)
                 }
@@ -568,14 +557,12 @@ class HomeActionLauncher(private val context: Context) {
             launchDefaultHomeOnDisplayAwait(isTop = false)
             if (!isManualSequence) return
         } else {
-            val showAllApps = prefs.getBoolean(KEY_SHOW_ALL_APPS, false)
-            val launcherApps = getLaunchableApps(context, showAllApps)
-            val appToLaunch = launcherApps.find { it.packageName == targetPkg }
+            val launchIntent = resolveLaunchIntent(context, targetPkg)
 
-            if (appToLaunch != null) {
+            if (launchIntent != null) {
                 try {
-                    DualScreenLauncher.launchOnBottom(context, appToLaunch.launchIntent)
-                    DiagnosticsLogger.logEvent("Launcher", "LAUNCH_SUCCESS", "slot=BOTTOM package=$targetPkg", context)
+                    val launched = DualScreenLauncher.launchOnBottom(context, launchIntent)
+                    logLaunchResult("BOTTOM", targetPkg, launched)
                 } catch (e: Exception) {
                     DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=BOTTOM package=$targetPkg message=${e.message}", context)
                 }
@@ -583,6 +570,30 @@ class HomeActionLauncher(private val context: Context) {
                 DiagnosticsLogger.logEvent("Error", "LAUNCH_FAILED", "slot=BOTTOM package=$targetPkg message=App not found", context)
             }
         }
+    }
+
+    fun launchDefaultHomeOnFocus() {
+        val traceId = nextTraceId()
+        trace("FOCUS_HOME", traceId, "START")
+        val target = resolveFocusTarget()
+
+        when (target) {
+            FocusTarget.TOP -> launchDefaultHomeOnDisplay(isTop = true)
+            FocusTarget.BOTTOM -> launchDefaultHomeOnDisplay(isTop = false)
+            null -> {
+                DiagnosticsLogger.logEvent(
+                    TAG,
+                    "DEFAULT_HOME_FOCUS_FALLBACK",
+                    "reason=NoValidFocusedDisplay",
+                    context
+                )
+                if (context is AccessibilityService) {
+                    context.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+                }
+            }
+        }
+
+        trace("FOCUS_HOME", traceId, "END", "target=$target")
     }
 
     fun launchDefaultHomeOnTop() {

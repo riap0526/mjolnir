@@ -7,6 +7,11 @@ import android.graphics.drawable.Drawable
 import xyz.blacksheep.mjolnir.KEY_APP_BLACKLIST
 import xyz.blacksheep.mjolnir.PREFS_NAME
 import xyz.blacksheep.mjolnir.settings.settingsPrefs
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * A simple data class holding the display information for an installed application.
@@ -156,8 +161,9 @@ class AppQueryHelper(private val context: Context) {
     }
 
     companion object {
-        // volatile in-memory cache, shared across the app process
-        private val iconCache = mutableMapOf<String, Drawable>()
+        // In-memory cache shared across the app process. Written by the startup prewarm on a
+        // background thread while UI and launch code read it, so it must be thread-safe.
+        private val iconCache = ConcurrentHashMap<String, Drawable>()
 
         /**
          * Retrieves an icon from the in-memory cache or loads it from the PackageManager if missing.
@@ -185,6 +191,35 @@ class AppQueryHelper(private val context: Context) {
          *
          * @param context Android Context.
          */
+        private val prewarmRunning = AtomicBoolean(false)
+
+        /**
+         * Warms the icon cache on a background thread for the settings UI. Call it when a Mjolnir
+         * screen opens; concurrent calls are ignored while one is running.
+         */
+        fun prewarmInBackground(context: Context, source: String) {
+            if (!prewarmRunning.compareAndSet(false, true)) return
+            val appContext = context.applicationContext
+            CoroutineScope(Dispatchers.IO).launch {
+                DiagnosticsLogger.logEvent("App", "ICON_PREWARM_START", "source=$source cached=${iconCache.size}", appContext)
+                val startTime = System.currentTimeMillis()
+                try {
+                    prewarmAllApps(appContext)
+                    val duration = System.currentTimeMillis() - startTime
+                    DiagnosticsLogger.logEvent("App", "ICON_PREWARM_END", "durationMs=$duration cached=${iconCache.size}", appContext)
+                } catch (e: Exception) {
+                    DiagnosticsLogger.logException("App", e, appContext)
+                } finally {
+                    prewarmRunning.set(false)
+                }
+            }
+        }
+
+        /** Drops all cached icons; they are reloaded on demand. */
+        fun clearIconCache() {
+            iconCache.clear()
+        }
+
         fun prewarmAllApps(context: Context) {
             val pm = context.packageManager
 

@@ -14,7 +14,8 @@ import androidx.activity.ComponentActivity
 import androidx.core.content.edit
 import xyz.blacksheep.mjolnir.onboarding.OnboardingActivity
 import xyz.blacksheep.mjolnir.model.MainScreen
-import xyz.blacksheep.mjolnir.launchers.getLaunchableApps
+import xyz.blacksheep.mjolnir.launchers.resolveLaunchIntent
+import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
 import xyz.blacksheep.mjolnir.utils.DualScreenLauncher
 import xyz.blacksheep.mjolnir.settings.settingsPrefs
 
@@ -28,6 +29,12 @@ class HomeActivity : ComponentActivity() {
         val isInterceptionActive = prefs.getBoolean(KEY_HOME_INTERCEPTION_ACTIVE, false)
         val topAppPkg = prefs.getString(KEY_TOP_APP, null)
         val bottomAppPkg = prefs.getString(KEY_BOTTOM_APP, null)
+        DiagnosticsLogger.logEvent(
+            "HomeActivity",
+            "START",
+            "displayId=${currentDisplayId()} categories=${intent?.categories} advanced=$isInterceptionActive top=$topAppPkg bottom=$bottomAppPkg",
+            this
+        )
 
         if (!isInterceptionActive) {
             // In Basic Mode, both screens must be set. 
@@ -37,6 +44,7 @@ class HomeActivity : ComponentActivity() {
             val isBottomSet = bottomAppPkg != null
 
             if (isTopSet xor isBottomSet) {
+                DiagnosticsLogger.logEvent("HomeActivity", "CONFIG_WIPE", "reason=basic_mode_single_slot", this)
                 wipeConfigAndLaunchOnboarding()
                 return
             }
@@ -44,6 +52,7 @@ class HomeActivity : ComponentActivity() {
         // ---------------------------------------
 
         if (!isConfigurationValid()) {
+            DiagnosticsLogger.logEvent("HomeActivity", "CONFIG_WIPE", "reason=invalid_configuration", this)
             wipeConfigAndLaunchOnboarding()
             return
         }
@@ -51,6 +60,7 @@ class HomeActivity : ComponentActivity() {
         val failureCount = prefs.getInt(KEY_LAUNCH_FAILURE_COUNT, 0)
 
         if (failureCount >= 3) {
+            DiagnosticsLogger.logEvent("HomeActivity", "CONFIG_WIPE", "reason=repeated_launch_failures count=$failureCount", this)
             prefs.edit { putInt(KEY_LAUNCH_FAILURE_COUNT, 0) }
             Toast.makeText(this, "Repeated launch failures. Resetting configuration.", Toast.LENGTH_LONG).show()
             wipeConfigAndLaunchOnboarding()
@@ -61,38 +71,44 @@ class HomeActivity : ComponentActivity() {
 
         //val topAppPkg = prefs.getString(KEY_TOP_APP, null)
         //val bottomAppPkg = prefs.getString(KEY_BOTTOM_APP, null)
-        val showAllApps = prefs.getBoolean(KEY_SHOW_ALL_APPS, false)
-        val mainScreen = MainScreen.valueOf(prefs.getString(KEY_MAIN_SCREEN, MainScreen.TOP.name) ?: MainScreen.TOP.name)
+        val mainScreen = MainScreen.fromPref(prefs.getString(KEY_MAIN_SCREEN, null))
 
         if (topAppPkg != null || bottomAppPkg != null) {
-            val launcherApps = getLaunchableApps(this, showAllApps)
-
             if (topAppPkg == null || bottomAppPkg == null) {
                  val targetPkg = topAppPkg ?: bottomAppPkg
-                 val appToLaunch = launcherApps.find { it.packageName == targetPkg }
-                 if (appToLaunch != null) {
-                     if (mainScreen == MainScreen.TOP) {
-                         DualScreenLauncher.launchOnTop(this, appToLaunch.launchIntent)
+                 val launchIntent = targetPkg?.let { resolveLaunchIntent(this, it) }
+                 if (launchIntent != null) {
+                     val launched = if (mainScreen == MainScreen.TOP) {
+                         DualScreenLauncher.launchOnTop(this, launchIntent)
                      } else {
-                         DualScreenLauncher.launchOnBottom(this, appToLaunch.launchIntent)
+                         DualScreenLauncher.launchOnBottom(this, launchIntent)
                      }
+                     DiagnosticsLogger.logEvent("HomeActivity", "LAUNCH_SINGLE", "package=$targetPkg mainScreen=$mainScreen launched=$launched", this)
                      prefs.edit { putInt(KEY_LAUNCH_FAILURE_COUNT, 0) }
                  } else {
+                      DiagnosticsLogger.logEvent("HomeActivity", "LAUNCH_FAILED", "package=$targetPkg reason=not_launchable failureCount=${failureCount + 1}", this)
                       prefs.edit { putInt(KEY_LAUNCH_FAILURE_COUNT, failureCount + 1) }
                       launchSettings()
                  }
             } else {
-                val topApp = launcherApps.find { it.packageName == topAppPkg }
-                val bottomApp = launcherApps.find { it.packageName == bottomAppPkg }
+                val topIntent = resolveLaunchIntent(this, topAppPkg)
+                val bottomIntent = resolveLaunchIntent(this, bottomAppPkg)
 
-                if (topApp != null && bottomApp != null) {
-                    val success = DualScreenLauncher.launchOnDualScreens(this, topApp.launchIntent, bottomApp.launchIntent, mainScreen)
+                if (topIntent != null && bottomIntent != null) {
+                    val success = DualScreenLauncher.launchOnDualScreens(this, topIntent, bottomIntent, mainScreen)
+                    DiagnosticsLogger.logEvent("HomeActivity", "LAUNCH_BOTH", "mainScreen=$mainScreen success=$success", this)
                     if (success) {
                         prefs.edit { putInt(KEY_LAUNCH_FAILURE_COUNT, 0) }
                     } else {
                         prefs.edit { putInt(KEY_LAUNCH_FAILURE_COUNT, failureCount + 1) }
                     }
                 } else {
+                    DiagnosticsLogger.logEvent(
+                        "HomeActivity",
+                        "LAUNCH_FAILED",
+                        "topLaunchable=${topIntent != null} bottomLaunchable=${bottomIntent != null} failureCount=${failureCount + 1}",
+                        this
+                    )
                     prefs.edit { putInt(KEY_LAUNCH_FAILURE_COUNT, failureCount + 1) }
                     launchSettings()
                 }
@@ -102,6 +118,10 @@ class HomeActivity : ComponentActivity() {
         }
         finish()
     }
+
+    @Suppress("DEPRECATION")
+    private fun currentDisplayId(): Int? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display?.displayId else windowManager.defaultDisplay?.displayId
 
     private fun isConfigurationValid(): Boolean {
         val prefs = settingsPrefs()
