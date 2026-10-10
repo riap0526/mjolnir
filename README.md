@@ -1,4 +1,4 @@
-# **Mjolnir** (Samurai47 fork)
+# **Mjolnir** fork
 
 > **This is a personal-use fork of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir).** It focuses on **stability fixes and small improvements** to the existing features; there are no major changes or new features. See [Disclaimer](#%EF%B8%8F-disclaimer) and [Credits](#-credits) before using it.
 
