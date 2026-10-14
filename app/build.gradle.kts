@@ -55,6 +55,10 @@ android {
             )
         }
     }
+    testOptions {
+        // android.util.Log and Build fields return defaults in JVM unit tests instead of throwing.
+        unitTests.isReturnDefaultValues = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -80,17 +84,14 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material3.windowSize)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.ktor.client.android)
-    implementation(libs.jsoup)
     implementation(libs.androidx.documentfile)
     implementation(libs.coil.compose)
     implementation(libs.androidx.browser)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.constraintlayout.compose)
-    implementation(libs.accompanist.drawablepainter)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
