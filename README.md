@@ -2,8 +2,6 @@
 
 > **This is a personal-use fork of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir).** It focuses on **stability fixes and small improvements** to the existing features; there are no major changes or new features. See [Disclaimer](#disclaimer) and [Credits](#credits) before using it.
 
-## Mjolnir Dual-Screen Update
-
 Mjolnir is a Home button router built for multi-display Android devices. It gives you precise control over what happens when you press the Home button — routing frontends or launchers to the top display, bottom display, or both.  
 With **BOTH: Home**, dual-screen frontends (iisu, cocoon, console launcher, etc.) can launch both screens with a single button press.  
 With **FOCUS: Home**, you can do the same but only for the selected screen.  
