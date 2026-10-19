@@ -334,14 +334,16 @@ class HomeActionLauncher(private val context: Context) {
                     return@launch
                 }
 
+                // The app launched LAST gets input focus, so the Main Screen goes last
+                // (same order as HomeActivity / DualScreenLauncher.launchOnDualScreens; upstream #38).
                 if (mainScreen == MainScreen.TOP) {
-                    launchTopAwait()
-                    if (interLaunchDelayMs > 0) delay(interLaunchDelayMs)
                     launchBottomAwait()
+                    if (interLaunchDelayMs > 0) delay(interLaunchDelayMs)
+                    launchTopAwait()
                 } else {
-                    launchBottomAwait()
-                    if (interLaunchDelayMs > 0) delay(interLaunchDelayMs)
                     launchTopAwait()
+                    if (interLaunchDelayMs > 0) delay(interLaunchDelayMs)
+                    launchBottomAwait()
                 }
             } finally {
                 trace("BOTH_AUTO", traceId, "END")
@@ -621,14 +623,15 @@ class HomeActionLauncher(private val context: Context) {
         val interLaunchDelayMs = getInterLaunchDelayMs()
         scope.launch {
             try {
+                // Main Screen goes last so it keeps input focus (upstream #38).
                 if (mainScreen == MainScreen.TOP) {
-                    launchDefaultHomeOnDisplayAwait(isTop = true)
-                    if (interLaunchDelayMs > 0) delay(interLaunchDelayMs)
                     launchDefaultHomeOnDisplayAwait(isTop = false)
+                    if (interLaunchDelayMs > 0) delay(interLaunchDelayMs)
+                    launchDefaultHomeOnDisplayAwait(isTop = true)
                 } else {
-                    launchDefaultHomeOnDisplayAwait(isTop = false)
-                    if (interLaunchDelayMs > 0) delay(interLaunchDelayMs)
                     launchDefaultHomeOnDisplayAwait(isTop = true)
+                    if (interLaunchDelayMs > 0) delay(interLaunchDelayMs)
+                    launchDefaultHomeOnDisplayAwait(isTop = false)
                 }
             } finally {
                 trace("BOTH_HOME", traceId, "END")
