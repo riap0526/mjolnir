@@ -26,8 +26,6 @@ Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and 
 - **Better diagnostics**: previous process exit reason (incl. whether it was before boot), SafetyNet visibility, HomeActivity decisions and raw Home key events.
 - **Signed release builds via GitHub Actions** (see [`docs/BUILDING.md`](./docs/BUILDING.md)).
 
-> **Switching from the upstream APK:** this fork is signed with a different key, so Android requires uninstalling the upstream app first, which **deletes `/Android/data/xyz.blacksheep.mjolnir/`**. Back that folder up first. Step-by-step instructions: [`docs/BUILDING.md`](./docs/BUILDING.md#從原作者版本換成本-fork重要).
-
 ---
 
 ## Features & Usage
