@@ -10,8 +10,6 @@ Prefer mixing single-screen activities? **BOTH: Auto** and **FOCUS: Auto** are h
 
 Originally designed for the **AYN Thor**, it also works on single-screen devices as a Home-button automation tool. **Device support:** AYN Thor is the primary supported target; RG-DS is not officially supported.
 
-[Releases](https://github.com/riap0526/mjolnir/releases) | [Add to Obtanium](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium%3A%2F%2Fapp%2F%7B%22id%22%3A%22xyz.blacksheep.mjolnir%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Friap0526%2Fmjolnir%22%2C%22author%22%3A%22riap0526%22%2C%22name%22%3A%22Mjolnir%22%2C%22apkUrls%22%3Anull%2C%22otherAssetUrls%22%3Anull%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%7D%22%2C%22overrideSource%22%3A%22GitHub%22%2C%22allowIdChange%22%3Afalse%7D)
-
 ---
 
 ## What's Different in This Fork
