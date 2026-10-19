@@ -24,7 +24,6 @@ Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and 
 - **Lighter background process**: app icons are only loaded when a Mjolnir screen is opened, and released when it is hidden.
 - **Thread-safety and fewer redundant restarts** of the keep-alive service; no-op settings writes are skipped.
 - **Better diagnostics**: previous process exit reason (incl. whether it was before boot), SafetyNet visibility, HomeActivity decisions and raw Home key events.
-- **Signed release builds via GitHub Actions** (see [`docs/BUILDING.md`](./docs/BUILDING.md)).
 
 ---
 
