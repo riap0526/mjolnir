@@ -16,12 +16,6 @@ Originally designed for the **AYN Thor**, it also works on single-screen devices
 
 Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and [`docs/notes/`](./docs/notes/).
 
-**v0.2.8a**
-
-- Removed the in-app donation button; About links to this fork and credits the original project. No behavior changes.
-
-**v0.2.8**
-
 - **Settings survive crashes and power loss**: settings and gesture presets are written durably (fsync + `.bak` backup). A corrupt file is restored from the backup and kept as `.corrupt`; deleting a file still resets it as before.
 - **Hidden or blacklisted apps no longer break the Home button**: configured apps are launched directly by package name, so they no longer fail and wipe the configuration after 3 attempts.
 - **FOCUS: Home routes to the focused display** and the Home gesture state machine ignores key repeats, unpaired events and the release after a long press (merged from [ghgoodreau](https://github.com/ghgoodreau/mjolnir)'s `fix/focused-home-routing`).
