@@ -40,12 +40,6 @@ Settings and logs live in `/Android/data/xyz.blacksheep.mjolnir/`. Building and 
 
 ---
 
-## Contributing
-
-Bug reports are welcome via [Issues](https://github.com/riap0526/mjolnir/issues). This fork is maintained mainly for personal use, so feature requests may not be picked up.
-
----
-
 ## Credits
 
 - **[blacksheepmvp](https://github.com/blacksheepmvp)** — original author of Mjolnir. This fork is based entirely on the code of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir); all original design and features are theirs.
