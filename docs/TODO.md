@@ -13,6 +13,7 @@
 - **疑似影響**：上螢幕偶發停在「You should not be here」（SafetyNet），開機後尤其常見。
 - **先確認**：發生時的 `SafetyNet VISIBLE`、`HomeActivity START` 與 `LAUNCH_*` 事件順序。
 - **相關**：`HomeActivity.kt`、`HomeKeyInterceptorService.maybeRunBootAction()`、`SafetyNetManager.kt`
+- **參考**：Etsum fork 對上游 #31 的做法（SafetyNet 露出時重開槽位 App），見 [`notes/2026-10-19-etsum-fork-port.md`](notes/2026-10-19-etsum-fork-port.md) B 節。
 
 ### 2. Thor「全部清除」會殺掉 Mjolnir 行程
 - **現象**：Mjolnir 不出現在最近使用清單，使用者無法上鎖。10-03、10-04、10-08 三次被 `SIGNALED`（SIGKILL）結束，之前 5 到 15 秒都出現最近使用的應用程式畫面，比較可能是「全部清除」造成的（修正了 10-03 「喚醒時被殺」的推測）。
@@ -44,7 +45,7 @@
 
 ## 中優先
 
-9. **`buildDefaultHomeIntent()` 解析錯誤**：沒有預設桌面時會得到系統選擇器（package 為 `android`）；Mjolnir 本身是預設桌面時會繞回 `HomeActivity`。（`home/HomeActionLauncher.kt`）
+9. **`buildDefaultHomeIntent()` 解析錯誤**：沒有預設桌面時會得到系統選擇器（package 為 `android`）；Mjolnir 本身是預設桌面時會繞回 `HomeActivity`。（`home/HomeActionLauncher.kt`）另外 TOP/BOTTOM: Home 用 `GLOBAL_ACTION_HOME`，在 Thor 上兩個螢幕都會回桌面（上游 #34、#35）；Etsum fork 的做法見 [`notes/2026-10-19-etsum-fork-port.md`](notes/2026-10-19-etsum-fork-port.md) A 節。🧪
 10. **防呆可被繞過**：通知上的「Enable Advanced」直接翻轉開關，不檢查前置條件；`SteamFileGenActivity` 內複製來的設定頁可以只設定單一螢幕，繞過 onboarding 的檢查。
 11. **`settings.json` 的 `TOP_APP` / `BOTTOM_APP` 填空字串**會被當成「已設定」。檔案註解卻寫著可以留空。
 12. **`runShellCommand` 可能 deadlock**：先 `waitFor()` 才讀輸出，輸出量大時（`dumpsys SurfaceFlinger`）會互相等待。只影響 root 裝置的舊版截圖路徑與完整診斷。（`utils/ScreenshotUtil.kt`、`utils/DiagnosticsLogger.kt`）

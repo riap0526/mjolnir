@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+# Mjolnir v0.2.8b - Bug fixes (fork)
+
+Small, low-risk fixes ported from [Etsum/mjolnir](https://github.com/Etsum/mjolnir) (another fork of upstream v0.2.7a). Details: `docs/notes/2026-10-19-etsum-fork-port.md`.
+
+- **BOTH: Auto / BOTH: Home focus** (upstream #38): the Main Screen is launched last again so it keeps input focus, matching HomeActivity and v0.2.7.
+- **Start on boot waits for the SD card** (upstream #29): up to 10 s while a removable volume is still checking or unmounted, so apps on the SD card (e.g. ES-DE) do not start with empty data.
+- **Gesture presets**: "New" is an unsaved draft until Save (Cancel or Back leaves no `untitled-N.cfg`); saving without renaming no longer moves the file to `name-2.cfg`; saving a built-in preset (Type-A/B/C) under a new name creates a named copy; system Back in the editor cancels.
+- Robolectric unit tests for gesture preset saving.
+
+Not ported (behavior changes, need on-device testing): single-screen TOP/BOTTOM: Home (upstream #34, #35) and SafetyNet reopening the slot app (upstream #31). Hide from Recents stays dropped.
+
+---
+
 # Mjolnir v0.2.8a - Maintenance (fork)
 
 Same app as v0.2.8; no behavior changes.

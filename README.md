@@ -18,6 +18,13 @@ Originally designed for the **AYN Thor**, it also works on single-screen devices
 
 Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and [`docs/notes/`](./docs/notes/).
 
+**v0.2.8b**
+
+- **BOTH: Auto / BOTH: Home keep focus on the Main Screen** again (upstream #38).
+- **Start on boot waits for the SD card** (up to 10 s), so apps on the SD card don't open with a fresh setup (upstream #29).
+- **Gesture presets**: cancelling "New" leaves no `untitled-N.cfg`, saving without renaming no longer creates `name-2.cfg`, and Back in the editor cancels.
+- Ported from [Etsum](https://github.com/Etsum/mjolnir)'s fork; see [`docs/notes/2026-10-19-etsum-fork-port.md`](./docs/notes/2026-10-19-etsum-fork-port.md).
+
 **v0.2.8a**
 
 - Removed the in-app donation button; About links to this fork and credits the original project. No behavior changes.
@@ -58,6 +65,7 @@ Bug reports are welcome via [Issues](https://github.com/riap0526/mjolnir/issues)
 
 - **[blacksheepmvp](https://github.com/blacksheepmvp)** — original author of Mjolnir. This fork is based entirely on the code of [blacksheepmvp/mjolnir](https://github.com/blacksheepmvp/mjolnir); all original design and features are theirs.
 - **[ghgoodreau](https://github.com/ghgoodreau)** — focused-display Home routing and Home gesture state hardening ([`fix/focused-home-routing`](https://github.com/ghgoodreau/mjolnir/tree/fix/focused-home-routing)), merged into this fork with authorship preserved.
+- **[Etsum](https://github.com/Etsum)** — fixes for BOTH focus order, waiting for the SD card on boot, and gesture preset saving ([Etsum/mjolnir](https://github.com/Etsum/mjolnir)), ported into v0.2.8b.
 
 ---
 

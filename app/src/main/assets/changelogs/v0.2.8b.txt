@@ -1,0 +1,7 @@
+# Mjolnir v0.2.8b
+
+Bug fixes on top of v0.2.8a.
+
+- BOTH: Auto and BOTH: Home open the Main Screen last again, so it keeps input focus (as in v0.2.7).
+- Start on boot waits for the SD card to mount (up to 10 seconds), so apps on the SD card do not open with a fresh setup.
+- Gesture presets: "New" no longer leaves an untitled file when you cancel, saving without renaming no longer adds "-2" to the file name, and Back in the preset editor now cancels.
