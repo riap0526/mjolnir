@@ -659,10 +659,7 @@ fun HomeLauncherSettingsMenu(
                         showDeleteDialog = true
                     },
                     onNew = {
-                        val created = GestureConfigStore.createPresetFromActive(context)
-                        presetRefreshTick++
-                        setActiveGestureConfig(created.fileName)
-                        refreshActivePreset()
+                        GestureConfigStore.createPresetFromActive(context)
                         navController.navigate("gesture_preset_edit")
                     },
                     enableContextMenu = true

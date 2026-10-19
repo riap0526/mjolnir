@@ -3,6 +3,7 @@ package xyz.blacksheep.mjolnir.settings
 import android.content.Intent
 import android.view.ViewConfiguration
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,6 +71,9 @@ fun GesturePresetEditorScreen(
     val stepLongPress = 25
     val longPressSteps = (maxLongPress - minLongPress) / stepLongPress - 1
     val displayedLongPress = if (config.longPressDelayMs > 0) config.longPressDelayMs else systemLongPress
+
+    // System Back = Cancel, so an abandoned draft cannot leak into the next Edit.
+    BackHandler(onBack = onCancel)
 
     Scaffold(containerColor = Color.Transparent) { padding ->
         Box(

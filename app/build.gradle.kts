@@ -92,6 +92,8 @@ dependencies {
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.accompanist.drawablepainter)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

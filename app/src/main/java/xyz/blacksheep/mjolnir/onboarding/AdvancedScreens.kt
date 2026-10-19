@@ -472,9 +472,7 @@ fun AdvancedGestureScreen(navController: NavController, viewModel: OnboardingVie
                         showDeleteDialog = true
                     },
                     onNew = {
-                        val created = GestureConfigStore.createPresetFromActive(context)
-                        viewModel.setGesturePreset(created.fileName)
-                        presetRefreshTick++
+                        GestureConfigStore.createPresetFromActive(context)
                         onNavigate { navController.navigate("advanced_gesture_edit") }
                     },
                     enableContextMenu = true

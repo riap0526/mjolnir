@@ -204,12 +204,11 @@ object GestureConfigStore {
             prefs.contains(xyz.blacksheep.mjolnir.KEY_LONG_HOME_ACTION)
     }
 
+    /** Starts an unsaved draft copy of the active preset. Nothing is written until the editor saves. */
     fun createPresetFromActive(context: Context): GestureConfig {
-        val active = getActiveConfig(context)
         val untitledBase = nextUntitledBase(context)
-        val fileName = "$untitledBase.cfg"
-        val config = active.copy(fileName = fileName, name = untitledBase)
-        writeConfig(context, config)
+        val config = getActiveConfig(context).copy(fileName = "$untitledBase.cfg", name = untitledBase)
+        draftConfig = config
         return config
     }
 
@@ -243,11 +242,25 @@ object GestureConfigStore {
         return saved
     }
 
+    /**
+     * Single save path for the preset editor.
+     * Drafts become new files. A built-in preset (Type-A/B/C) saved under a new name becomes a
+     * new preset, because built-ins cannot be renamed. Other presets are renamed in place.
+     */
+    fun saveFromEditor(context: Context, config: GestureConfig, desiredName: String, isDraft: Boolean): GestureConfig {
+        val renamingBuiltIn = isReserved(config.fileName) && desiredName.trim() != config.name
+        if (isDraft || renamingBuiltIn) return saveDraft(context, config, desiredName)
+        val saved = renamePreset(context, config, desiredName)
+        saveConfig(context, saved)
+        setActiveConfig(context, saved.fileName)
+        return saved
+    }
+
     fun renamePreset(context: Context, config: GestureConfig, newDisplayName: String): GestureConfig {
         if (isReserved(config.fileName)) return config
         val displayName = newDisplayName.trim().ifBlank { nextUntitledBase(context) }
         val stem = normalizeTitle(displayName).ifBlank { nextUntitledBase(context) }
-        val newFileName = nextAvailableFileName(context, "$stem.cfg")
+        val newFileName = nextAvailableFileName(context, "$stem.cfg", ownFileName = config.fileName)
         val dir = gestureDir(context)
         val oldFile = File(dir, config.fileName)
         val newFile = File(dir, newFileName)
@@ -422,17 +435,19 @@ object GestureConfigStore {
         DurableFiles.write(file, content)
     }
 
-    private fun nextAvailableFileName(context: Context, baseName: String): String {
+    /** [ownFileName] counts as free, so saving a preset never collides with its own file. */
+    private fun nextAvailableFileName(context: Context, baseName: String, ownFileName: String? = null): String {
         val dir = gestureDir(context)
+        fun isFree(name: String) = name == ownFileName || !File(dir, name).exists()
         var candidate = baseName
         if (!candidate.endsWith(".cfg")) candidate = "$candidate.cfg"
-        if (!File(dir, candidate).exists()) return candidate
+        if (isFree(candidate)) return candidate
 
         val stem = candidate.removeSuffix(".cfg")
         var index = 2
         while (true) {
             val next = "$stem-$index.cfg"
-            if (!File(dir, next).exists()) return next
+            if (isFree(next)) return next
             index++
         }
     }

@@ -91,14 +91,7 @@ fun SettingsNavHost(
                 },
                 onNameChange = { nameState.value = it },
                 onSave = {
-                    val saved = if (isDraft) {
-                        GestureConfigStore.saveDraft(context, configState.value, nameState.value)
-                    } else {
-                        val renamed = GestureConfigStore.renamePreset(context, configState.value, nameState.value)
-                        GestureConfigStore.saveConfig(context, renamed)
-                        GestureConfigStore.setActiveConfig(context, renamed.fileName)
-                        renamed
-                    }
+                    val saved = GestureConfigStore.saveFromEditor(context, configState.value, nameState.value, isDraft)
                     configState.value = saved
                     navController.popBackStack()
                 },

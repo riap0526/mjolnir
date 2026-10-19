@@ -239,14 +239,7 @@ fun OnboardingNavHost(viewModel: OnboardingViewModel) {
                     },
                     onNameChange = { nameValue = it },
                     onSave = {
-                        val saved = if (isDraft) {
-                            GestureConfigStore.saveDraft(context, workingConfig, nameValue)
-                        } else {
-                            val renamed = GestureConfigStore.renamePreset(context, workingConfig, nameValue)
-                            GestureConfigStore.saveConfig(context, renamed)
-                            GestureConfigStore.setActiveConfig(context, renamed.fileName)
-                            renamed
-                        }
+                        val saved = GestureConfigStore.saveFromEditor(context, workingConfig, nameValue, isDraft)
                         viewModel.setGesturePreset(saved.fileName)
                         viewModel.setGestureAction(Gesture.SINGLE, saved.single)
                         viewModel.setGestureAction(Gesture.DOUBLE, saved.double)
