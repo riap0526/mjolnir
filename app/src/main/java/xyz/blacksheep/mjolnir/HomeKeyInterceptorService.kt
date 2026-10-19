@@ -11,11 +11,13 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.storage.StorageManager
 import android.provider.Settings
 import android.view.KeyEvent
 import android.view.ViewConfiguration
@@ -63,6 +65,8 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         const val ACTION_REQ_COLLAPSE_SHADE = "xyz.blacksheep.mjolnir.ACTION_REQ_COLLAPSE_SHADE"
         const val ACTION_REQ_SWAP_SCREENS = "xyz.blacksheep.mjolnir.ACTION_REQ_SWAP_SCREENS"
         @Volatile var lastFocusedDisplayId: Int? = null
+        private const val STORAGE_WAIT_STEP_MS = 500L
+        private const val STORAGE_WAIT_MAX_ATTEMPTS = 20
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -256,7 +260,28 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
             }
         }, 250)
 
-        maybeRunBootAction()
+        runWhenStorageReady { maybeRunBootAction() }
+    }
+
+    /**
+     * Upstream #29: a slot app on the SD card (e.g. ES-DE) starts with empty data if Mjolnir
+     * opens it before the card mounts. Waits up to 10 s for removable storage, then runs [action].
+     */
+    private fun runWhenStorageReady(attempt: Int = 0, action: () -> Unit) {
+        // The service was unbound while waiting; a reconnect runs its own boot check.
+        if (attempt > 0 && instance !== this) return
+        val waiting = runCatching {
+            getSystemService(StorageManager::class.java).storageVolumes.any {
+                it.isRemovable && it.state in setOf(Environment.MEDIA_CHECKING, Environment.MEDIA_UNMOUNTED)
+            }
+        }.getOrDefault(false)
+        if (waiting && attempt < STORAGE_WAIT_MAX_ATTEMPTS) {
+            if (attempt == 0) DiagnosticsLogger.logEvent("Gesture", "AUTO_BOOT_WAIT_STORAGE", context = this)
+            gestureHandler.postDelayed({ runWhenStorageReady(attempt + 1, action) }, STORAGE_WAIT_STEP_MS)
+            return
+        }
+        if (attempt > 0) DiagnosticsLogger.logEvent("Gesture", "AUTO_BOOT_STORAGE_DONE", "waitedMs=${attempt * STORAGE_WAIT_STEP_MS} stillWaiting=$waiting", this)
+        action()
     }
 
     private fun maybeRunBootAction() {
