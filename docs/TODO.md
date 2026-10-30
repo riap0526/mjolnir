@@ -13,6 +13,7 @@
 - **疑似影響**：上螢幕偶發停在「You should not be here」（SafetyNet），開機後尤其常見。
 - **先確認**：發生時的 `SafetyNet VISIBLE`、`HomeActivity START` 與 `LAUNCH_*` 事件順序。
 - **相關**：`HomeActivity.kt`、`HomeKeyInterceptorService.maybeRunBootAction()`、`SafetyNetManager.kt`
+- **10-31 實例**：開機後 ES-DE 被開啟約 5 到 8 秒就離開上螢幕，SafetyNet 停住且沒有恢復，見 [`notes/2026-10-31-boot-safetynet-log.md`](notes/2026-10-31-boot-safetynet-log.md)。
 - **參考**：Etsum fork 對上游 #31 的做法（SafetyNet 露出時重開槽位 App），見 [`notes/2026-10-19-etsum-fork-port.md`](notes/2026-10-19-etsum-fork-port.md) B 節。
 
 ### 2. Thor「全部清除」會殺掉 Mjolnir 行程
