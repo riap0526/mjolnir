@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+# Mjolnir v0.2.8c - Diagnostics (fork)
+
+Follow-up to the 2026-10-31 field log (top screen stuck on SafetyNet after boot). Details: `docs/notes/2026-10-31-boot-safetynet-log.md`.
+
+## Fix
+- **No more 5 s main-thread freeze**: package names in log lines came from `AccessibilityWindowInfo.getRoot()`, an IPC that waits up to 5 s for a busy app. They now come from a window → package map built from the accessibility events Mjolnir already receives. (Swap and the deferred boot launch still use `getRoot()`; they need it to work.)
+
+## Diagnostics
+- `SLOT_APP_WINDOW_REMOVED`: a window of the top or bottom app went away (needs the `typeWindowsChanged` accessibility event, now requested; it does not feed focus tracking).
+- SafetyNet: `VISIBLE` includes memory state, `HIDDEN` includes `visibleMs`, and `STUCK` is logged after 5 s visible.
+- `MEMORY_STATE` at process start and boot action; `TRIM_MEMORY` with its level.
+- `MAIN_THREAD_STALL` (first 2 minutes after the service connects) and `MAIN_THREAD_SLOW` for the focus fallback.
+- `AUTO_BOOT_VERIFY` 10 s and 30 s after the boot action, continued after a Mjolnir restart within 60 s.
+- `PREVIOUS_PROCESS_EXIT` lists every exit record not logged before (`n=i/N`), or `PREVIOUS_PROCESS_EXIT_NONE_NEW`.
+- `EVENT_DISPLAY_CAPTURED` is only logged when a display's package changes, with `suppressed=N` for the skipped events (about 85% fewer lines on the 10-31 log).
+
+## Build
+- Pushing a `v*` tag only builds; GitHub Releases are created only by a manual run with `release_tag`. Releases are paused while the upstream project has no license.
+
+---
+
 # Mjolnir v0.2.8b - Bug fixes (fork)
 
 Small, low-risk fixes ported from [Etsum/mjolnir](https://github.com/Etsum/mjolnir) (another fork of upstream v0.2.7a). Details: `docs/notes/2026-10-19-etsum-fork-port.md`.

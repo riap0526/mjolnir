@@ -1,0 +1,7 @@
+# Mjolnir v0.2.8c
+
+Diagnostics update on top of v0.2.8b.
+
+- Fixed a freeze of up to 5 seconds in Home handling when an app was starting (seen at boot).
+- The diagnostics log now records when the top or bottom app's window goes away, how long the "You should not be here." screen stays visible, memory pressure, main-thread stalls, and which app each screen shows 10 and 30 seconds after the boot action.
+- The log is smaller (repeated window events are summarized), so it covers a longer period.

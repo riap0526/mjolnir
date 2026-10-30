@@ -18,6 +18,11 @@ Originally designed for the **AYN Thor**, it also works on single-screen devices
 
 Based on upstream `v0.2.7a`. Full details in [CHANGELOG.md](./CHANGELOG.md) and [`docs/notes/`](./docs/notes/).
 
+**v0.2.8c**
+
+- Fixed a freeze of up to 5 s in Home handling while an app was starting (seen at boot).
+- More diagnostics for "stuck on SafetyNet after boot": slot app windows going away, SafetyNet visible time, memory pressure, main-thread stalls, and what each screen shows after the boot action. The log is also about 85% smaller for the same period.
+
 **v0.2.8b**
 
 - **BOTH: Auto / BOTH: Home keep focus on the Main Screen** again (upstream #38).
