@@ -86,14 +86,14 @@ jobs:
     outputs:
       signed: ${{ secrets.MJOLNIR_KEYSTORE_BASE64 != '' }}
 
-  # Publishes a GitHub Release with the signed APK, either when a v* tag is pushed or when the
-  # workflow is run manually with release_tag set (the tag is then created on the built commit).
+  # Publishes a GitHub Release with the signed APK only when the workflow is run manually with
+  # release_tag set (the tag is then created on the built commit). Pushing a v* tag only builds:
+  # releases are paused while the upstream project has no license (see docs/BUILDING.md).
   release:
     needs: build
     if: >-
       needs.build.outputs.signed == 'true' &&
-      (startsWith(github.ref, 'refs/tags/v') ||
-       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != ''))
+      github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
