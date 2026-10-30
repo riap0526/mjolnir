@@ -2,8 +2,14 @@ package xyz.blacksheep.mjolnir
 
 import android.os.Bundle
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
+import xyz.blacksheep.mjolnir.settings.settingsPrefs
+import xyz.blacksheep.mjolnir.utils.DiagnosticsConfig
 import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
+import xyz.blacksheep.mjolnir.utils.MemoryState
 import android.app.ActivityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,6 +26,19 @@ import androidx.compose.ui.graphics.Color
 class SafetyNetActivity : ComponentActivity() {
     companion object {
         private const val TAG = "SafetyNetActivity"
+        /** Visible this long means the slot app is not coming back by itself. */
+        private const val STUCK_AFTER_MS = 5_000L
+    }
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var visibleSince = 0L
+    private val stuckCheck = Runnable {
+        DiagnosticsLogger.logEvent(
+            "SafetyNet",
+            "STUCK",
+            "displayId=${currentDisplayId()} visibleMs=${SystemClock.elapsedRealtime() - visibleSince} ${slotSummary()} ${MemoryState.describe(this)}",
+            this
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,12 +53,22 @@ class SafetyNetActivity : ComponentActivity() {
     // should be there is gone or was never launched. Logged so those moments can be traced.
     override fun onResume() {
         super.onResume()
-        DiagnosticsLogger.logEvent("SafetyNet", "VISIBLE", "displayId=${currentDisplayId()} taskId=$taskId", this)
+        visibleSince = SystemClock.elapsedRealtime()
+        if (!DiagnosticsConfig.isEnabled(this)) return
+        DiagnosticsLogger.logEvent("SafetyNet", "VISIBLE", "displayId=${currentDisplayId()} taskId=$taskId ${MemoryState.describe(this)}", this)
+        handler.postDelayed(stuckCheck, STUCK_AFTER_MS)
     }
 
     override fun onPause() {
         super.onPause()
-        DiagnosticsLogger.logEvent("SafetyNet", "HIDDEN", "displayId=${currentDisplayId()} taskId=$taskId", this)
+        handler.removeCallbacks(stuckCheck)
+        val visibleMs = SystemClock.elapsedRealtime() - visibleSince
+        DiagnosticsLogger.logEvent("SafetyNet", "HIDDEN", "displayId=${currentDisplayId()} taskId=$taskId visibleMs=$visibleMs", this)
+    }
+
+    private fun slotSummary(): String {
+        val prefs = settingsPrefs()
+        return "top=${prefs.getString(KEY_TOP_APP, null)} bottom=${prefs.getString(KEY_BOTTOM_APP, null)}"
     }
 
     @Suppress("DEPRECATION")

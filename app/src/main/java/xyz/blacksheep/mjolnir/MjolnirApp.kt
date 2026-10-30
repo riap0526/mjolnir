@@ -14,6 +14,7 @@ import androidx.annotation.RequiresApi
 import xyz.blacksheep.mjolnir.utils.AppQueryHelper
 import xyz.blacksheep.mjolnir.utils.DiagnosticsConfig
 import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
+import xyz.blacksheep.mjolnir.utils.MemoryState
 import xyz.blacksheep.mjolnir.settings.SettingsStore
 import java.io.File
 import java.text.SimpleDateFormat
@@ -54,6 +55,9 @@ class MjolnirApp : Application() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        if (DiagnosticsConfig.isEnabled(this)) {
+            DiagnosticsLogger.logEvent("App", "TRIM_MEMORY", "level=${MemoryState.trimLevelName(level)} ${MemoryState.describe(this)}", this)
+        }
         // UI_HIDDEN: no Mjolnir screen is visible any more, so the icon cache has no user.
         if (level >= TRIM_MEMORY_UI_HIDDEN) {
             AppQueryHelper.clearIconCache()
@@ -69,24 +73,48 @@ class MjolnirApp : Application() {
             DiagnosticsLogger.logEvent("Settings", "SETTINGS_LOAD_ISSUE", issue, this)
         }
 
+        DiagnosticsLogger.logEvent("App", "MEMORY_STATE", "at=process_start ${MemoryState.describe(this)}", this)
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         try {
-            val activityManager = getSystemService(ActivityManager::class.java)
-            val last = activityManager.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull() ?: return
-            val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date(last.timestamp))
-            // A shutdown leaves no exit record, so the first start after boot sees an older one.
-            val bootTimeMs = System.currentTimeMillis() - SystemClock.elapsedRealtime()
-            val beforeBoot = last.timestamp < bootTimeMs
-            DiagnosticsLogger.logEvent(
-                "App",
-                "PREVIOUS_PROCESS_EXIT",
-                "reason=${exitReasonName(last.reason)} at=$time beforeBoot=$beforeBoot status=${last.status} " +
-                    "importance=${last.importance} pssKb=${last.pss} rssKb=${last.rss} description=${last.description}",
-                this
-            )
+            logNewExitRecords()
         } catch (e: Exception) {
             DiagnosticsLogger.logException("App", e, this)
         }
+    }
+
+    /**
+     * Logs every exit record not logged before, oldest first. Only the latest record used to be
+     * logged, so repeated kills in a row were invisible and a shutdown (which leaves no record)
+     * made the next boots repeat an old one.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun logNewExitRecords() {
+        val state = getSharedPreferences(DIAGNOSTICS_STATE_PREFS, MODE_PRIVATE)
+        val lastLoggedAt = state.getLong(KEY_LAST_LOGGED_EXIT_AT, 0L)
+        val records = getSystemService(ActivityManager::class.java)
+            .getHistoricalProcessExitReasons(packageName, 0, MAX_EXIT_RECORDS)
+            .filter { it.timestamp > lastLoggedAt }
+            .sortedBy { it.timestamp }
+        val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+        if (records.isEmpty()) {
+            val last = if (lastLoggedAt > 0) format.format(Date(lastLoggedAt)) else "none"
+            DiagnosticsLogger.logEvent("App", "PREVIOUS_PROCESS_EXIT_NONE_NEW", "lastLoggedAt=$last", this)
+            return
+        }
+        // A shutdown leaves no exit record, so the first start after boot can see older ones.
+        val bootTimeMs = System.currentTimeMillis() - SystemClock.elapsedRealtime()
+        records.forEachIndexed { index, record ->
+            DiagnosticsLogger.logEvent(
+                "App",
+                "PREVIOUS_PROCESS_EXIT",
+                "reason=${exitReasonName(record.reason)} at=${format.format(Date(record.timestamp))} " +
+                    "beforeBoot=${record.timestamp < bootTimeMs} status=${record.status} importance=${record.importance} " +
+                    "pssKb=${record.pss} rssKb=${record.rss} description=${record.description} n=${index + 1}/${records.size}",
+                this
+            )
+        }
+        state.edit().putLong(KEY_LAST_LOGGED_EXIT_AT, records.last().timestamp).apply()
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
@@ -172,5 +200,10 @@ class MjolnirApp : Application() {
 
     companion object {
         const val PERSISTENT_CHANNEL_ID = "mjolnir_persistent_channel"
+
+        /** Internal diagnostics bookkeeping, kept out of the user's settings files. */
+        const val DIAGNOSTICS_STATE_PREFS = "diagnostics_state"
+        private const val KEY_LAST_LOGGED_EXIT_AT = "last_logged_exit_at"
+        private const val MAX_EXIT_RECORDS = 16
     }
 }

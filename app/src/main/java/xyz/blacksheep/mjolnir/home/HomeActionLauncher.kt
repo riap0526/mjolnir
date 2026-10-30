@@ -25,6 +25,7 @@ import xyz.blacksheep.mjolnir.KEY_TOP_BOTTOM_LAUNCH_DELAY_MS
 import xyz.blacksheep.mjolnir.model.MainScreen
 import xyz.blacksheep.mjolnir.launchers.resolveLaunchIntent
 import xyz.blacksheep.mjolnir.utils.DiagnosticsLogger
+import xyz.blacksheep.mjolnir.utils.WindowPackages
 import xyz.blacksheep.mjolnir.utils.DualScreenLauncher
 import xyz.blacksheep.mjolnir.utils.FocusHackHelper
 import xyz.blacksheep.mjolnir.settings.settingsPrefs
@@ -103,25 +104,25 @@ class HomeActionLauncher(private val context: Context) {
 
         val byRoot = windows.firstOrNull { it.id == rootWindowId }
         if (byRoot != null) {
-            DiagnosticsLogger.logEvent(TAG, "FOCUS_WINDOW_FOUND", "source=rootInActiveWindow pkg=${byRoot.root?.packageName} displayId=${byRoot.displayId} focused=${byRoot.isFocused}", context)
+            DiagnosticsLogger.logEvent(TAG, "FOCUS_WINDOW_FOUND", "source=rootInActiveWindow pkg=${WindowPackages.packageOf(byRoot.id)} displayId=${byRoot.displayId} focused=${byRoot.isFocused}", context)
             return byRoot.displayId
         }
 
         val focused = windows.firstOrNull { it.isFocused && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
         if (focused != null) {
-            DiagnosticsLogger.logEvent(TAG, "FOCUS_WINDOW_FOUND", "source=focused pkg=${focused.root?.packageName} displayId=${focused.displayId}", context)
+            DiagnosticsLogger.logEvent(TAG, "FOCUS_WINDOW_FOUND", "source=focused pkg=${WindowPackages.packageOf(focused.id)} displayId=${focused.displayId}", context)
             return focused.displayId
         }
 
         val active = windows.firstOrNull { it.isActive && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
         if (active != null) {
-            DiagnosticsLogger.logEvent(TAG, "FOCUS_WINDOW_FOUND", "source=active pkg=${active.root?.packageName} displayId=${active.displayId}", context)
+            DiagnosticsLogger.logEvent(TAG, "FOCUS_WINDOW_FOUND", "source=active pkg=${WindowPackages.packageOf(active.id)} displayId=${active.displayId}", context)
             return active.displayId
         }
 
         val anyApp = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
         if (anyApp != null) {
-            DiagnosticsLogger.logEvent(TAG, "FOCUS_WINDOW_FOUND", "source=firstApp pkg=${anyApp.root?.packageName} displayId=${anyApp.displayId}", context)
+            DiagnosticsLogger.logEvent(TAG, "FOCUS_WINDOW_FOUND", "source=firstApp pkg=${WindowPackages.packageOf(anyApp.id)} displayId=${anyApp.displayId}", context)
             return anyApp.displayId
         }
 

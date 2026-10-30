@@ -29,6 +29,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import xyz.blacksheep.mjolnir.utils.MainThreadWatchdog
+import xyz.blacksheep.mjolnir.utils.MemoryState
+import xyz.blacksheep.mjolnir.utils.WindowPackages
 import xyz.blacksheep.mjolnir.home.Action
 import xyz.blacksheep.mjolnir.home.Gesture
 import xyz.blacksheep.mjolnir.home.HomeActionLauncher
@@ -67,6 +70,13 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         @Volatile var lastFocusedDisplayId: Int? = null
         private const val STORAGE_WAIT_STEP_MS = 500L
         private const val STORAGE_WAIT_MAX_ATTEMPTS = 20
+        /** Main-thread stalls are logged for this long after the service connects. */
+        private const val WATCHDOG_AFTER_CONNECT_MS = 120_000L
+        /** After the boot action, log which app each screen shows at these offsets. */
+        private val BOOT_VERIFY_OFFSETS_MS = longArrayOf(10_000L, 30_000L)
+        private const val BOOT_VERIFY_WINDOW_MS = 60_000L
+        private const val KEY_BOOT_ACTION_ELAPSED = "boot_action_elapsed"
+        private const val KEY_BOOT_ACTION_BOOT_COUNT = "boot_action_boot_count"
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -90,6 +100,11 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
     private var pendingBootBottomDisplayId: Int? = null
     private var bootBottomLaunchDone = false
     private var bootBottomRetryDone = false
+
+    private val watchdog by lazy { MainThreadWatchdog(this) }
+    // EVENT_DISPLAY_CAPTURED is only logged when a display's package changes (it was ~70% of the log).
+    private val lastLoggedPkgByDisplay = HashMap<Int, String?>()
+    private var suppressedDisplayEvents = 0
 
     private val ENABLE_GESTURE_TOAST = false
     private val ENABLE_GESTURE_HAPTIC = true
@@ -158,6 +173,15 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
             DiagnosticsLogger.logEvent("Focus", "SYSTEM_FOCUS_SCAN_SKIPPED", "reason=ApiTooLow", this)
             return
         }
+        val startedAt = SystemClock.uptimeMillis()
+        try {
+            resolveFocusFromAccessibilityWindows()
+        } finally {
+            MainThreadWatchdog.logIfSlow(this, "focus_fallback", startedAt)
+        }
+    }
+
+    private fun resolveFocusFromAccessibilityWindows() {
 
         val windows = windows
         val focused = windows.firstOrNull { it.isFocused && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
@@ -170,13 +194,12 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
             DiagnosticsLogger.logEvent(
                 "Focus",
                 "SYSTEM_FOCUS_FALLBACK_RESOLVED",
-                "displayId=$displayId pkg=${chosen.root?.packageName} focused=${chosen.isFocused} active=${chosen.isActive} windowId=${chosen.id}",
+                "displayId=$displayId pkg=${WindowPackages.packageOf(chosen.id)} focused=${chosen.isFocused} active=${chosen.isActive} windowId=${chosen.id}",
                 this
             )
             return
         }
 
-        // Building the dump queries every window root over IPC; skip it unless logging.
         if (!DiagnosticsConfig.isEnabled(this)) return
         val windowDump = windows.joinToString(
             prefix = "[",
@@ -184,7 +207,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
             limit = 12,
             truncated = "..."
         ) { win ->
-            val winPkg = win.root?.packageName?.toString()
+            val winPkg = WindowPackages.packageOf(win.id)
             "id=${win.id},disp=${win.displayId},type=${win.type},focused=${win.isFocused},active=${win.isActive},pkg=$winPkg"
         }
         DiagnosticsLogger.logEvent(
@@ -210,6 +233,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         super.onServiceConnected()
         DiagnosticsLogger.logEvent("Service", "ACCESSIBILITY_CONNECTED", context = this)
         instance = this
+        watchdog.start(WATCHDOG_AFTER_CONNECT_MS)
         prefs = settingsPrefs()
         prefs.registerOnSharedPreferenceChangeListener(this)
         actionLauncher = HomeActionLauncher(this)
@@ -296,8 +320,11 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
             val isFresh = isFreshBoot(prefs)
             if (!isFresh) {
                 DiagnosticsLogger.logEvent("Gesture", "AUTO_BOOT_SKIPPED", "reason=not_fresh_boot", this)
+                resumeBootVerify()
                 return
             }
+            DiagnosticsLogger.logEvent("Gesture", "MEMORY_STATE", "at=boot_action ${MemoryState.describe(this)}", this)
+            scheduleBootVerify()
 
             val startOnBootAuto = prefs.getBoolean(KEY_AUTO_BOOT_BOTH_HOME, true)
             if (startOnBootAuto) {
@@ -322,6 +349,73 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                 DiagnosticsLogger.logEvent("Gesture", "AUTO_BOOT_ACTION", "action=BOTH_HOME_DEFAULT", this)
                 performAction(Action.BOTH_HOME_DEFAULT)
             }
+        } catch (e: Exception) {
+            DiagnosticsLogger.logException("Gesture", e, this)
+        }
+    }
+
+    private fun diagnosticsState() = getSharedPreferences(MjolnirApp.DIAGNOSTICS_STATE_PREFS, MODE_PRIVATE)
+
+    private fun currentBootCount(): Int =
+        runCatching { Settings.Global.getInt(contentResolver, Settings.Global.BOOT_COUNT) }.getOrDefault(-1)
+
+    /**
+     * Records when the boot action ran and logs, [BOOT_VERIFY_OFFSETS_MS] later, which app each
+     * screen shows. The boot action is "done" once the launches are sent; this shows whether the
+     * apps actually stayed (field log 2026-10-31: ES-DE left the top screen ~10 s after boot).
+     */
+    private fun scheduleBootVerify() {
+        if (!DiagnosticsConfig.isEnabled(this)) return
+        diagnosticsState().edit()
+            .putLong(KEY_BOOT_ACTION_ELAPSED, SystemClock.elapsedRealtime())
+            .putInt(KEY_BOOT_ACTION_BOOT_COUNT, currentBootCount())
+            .apply()
+        for (offset in BOOT_VERIFY_OFFSETS_MS) {
+            gestureHandler.postDelayed({ logBootVerify("${offset / 1000}s") }, offset)
+        }
+    }
+
+    /** Mjolnir was restarted soon after the boot action (often killed at boot): finish the checks. */
+    private fun resumeBootVerify() {
+        if (!DiagnosticsConfig.isEnabled(this)) return
+        val state = diagnosticsState()
+        if (state.getInt(KEY_BOOT_ACTION_BOOT_COUNT, -2) != currentBootCount()) return
+        val sinceAction = SystemClock.elapsedRealtime() - state.getLong(KEY_BOOT_ACTION_ELAPSED, Long.MIN_VALUE / 2)
+        if (sinceAction !in 0 until BOOT_VERIFY_WINDOW_MS) return
+        var scheduled = false
+        for (offset in BOOT_VERIFY_OFFSETS_MS) {
+            val delay = offset - sinceAction
+            if (delay > 0) {
+                gestureHandler.postDelayed({ logBootVerify("${offset / 1000}s") }, delay)
+                scheduled = true
+            }
+        }
+        if (!scheduled) logBootVerify("after_restart_${sinceAction / 1000}s")
+    }
+
+    private fun logBootVerify(label: String) {
+        if (instance !== this || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        try {
+            val expectedTop = prefs.getString(KEY_TOP_APP, null)
+            val expectedBottom = prefs.getString(KEY_BOTTOM_APP, null)
+            val displays = (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).displays
+            val topId = displays.getOrNull(0)?.displayId
+            val bottomId = displays.getOrNull(1)?.displayId
+            val windowsByDisplay = windowsOnAllDisplays
+            val shown = HashMap<Int, String>()
+            for (i in 0 until windowsByDisplay.size()) {
+                val app = windowsByDisplay.valueAt(i).firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                shown[windowsByDisplay.keyAt(i)] = app?.let { WindowPackages.packageOf(it.id) ?: "unknown#${it.id}" } ?: "none"
+            }
+            val topShown = topId?.let { shown[it] }
+            val bottomShown = bottomId?.let { shown[it] }
+            DiagnosticsLogger.logEvent(
+                "Gesture",
+                "AUTO_BOOT_VERIFY",
+                "at=$label top=$topShown bottom=$bottomShown topOk=${topShown == expectedTop} bottomOk=${bottomShown == expectedBottom} " +
+                    "expectedTop=$expectedTop expectedBottom=$expectedBottom displays=$shown ${MemoryState.describe(this)}",
+                this
+            )
         } catch (e: Exception) {
             DiagnosticsLogger.logException("Gesture", e, this)
         }
@@ -701,7 +795,34 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         )
     }
 
+    /** Logs when a window of the top or bottom app goes away, e.g. the app was killed or closed. */
+    private fun onWindowsChanged(event: AccessibilityEvent) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        if (event.windowChanges and AccessibilityEvent.WINDOWS_CHANGE_REMOVED == 0) return
+        val removed = WindowPackages.remove(event.windowId) ?: return
+        val slot = when (removed.packageName) {
+            prefs.getString(KEY_TOP_APP, null) -> "TOP"
+            prefs.getString(KEY_BOTTOM_APP, null) -> "BOTTOM"
+            else -> return
+        }
+        DiagnosticsLogger.logEvent(
+            "Focus",
+            "SLOT_APP_WINDOW_REMOVED",
+            "slot=$slot pkg=${removed.packageName} displayId=${removed.displayId} windowId=${event.windowId} " +
+                "remainingWindows=${WindowPackages.countFor(removed.packageName)}",
+            this
+        )
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        val eventDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) event.displayId else -1
+        WindowPackages.record(event.windowId, event.packageName, eventDisplay)
+        // Only requested for SLOT_APP_WINDOW_REMOVED; kept out of the focus tracking below.
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            onWindowsChanged(event)
+            return
+        }
+
         if (pendingBootBottomLaunch) {
             val eventPkg = event.packageName?.toString()
             val defaultHome = pendingBootDefaultHome
@@ -724,7 +845,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                     limit = 6,
                     truncated = "..."
                 ) { win ->
-                    val winPkg = win.root?.packageName?.toString()
+                    val winPkg = WindowPackages.packageOf(win.id)
                     "disp=${win.displayId},type=${win.type},focused=${win.isFocused},pkg=$winPkg"
                 }
                 DiagnosticsLogger.logEvent(
@@ -754,12 +875,19 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         val eventDisplayId = event.displayId
         if (eventDisplayId != -1) {
             lastFocusedDisplayId = eventDisplayId
-            DiagnosticsLogger.logEvent(
-                "Focus",
-                "EVENT_DISPLAY_CAPTURED",
-                "type=$eventType displayId=$eventDisplayId windowId=${event.windowId} pkg=${event.packageName}",
-                this
-            )
+            val eventPkgName = event.packageName?.toString()
+            if (!lastLoggedPkgByDisplay.containsKey(eventDisplayId) || lastLoggedPkgByDisplay[eventDisplayId] != eventPkgName) {
+                lastLoggedPkgByDisplay[eventDisplayId] = eventPkgName
+                DiagnosticsLogger.logEvent(
+                    "Focus",
+                    "EVENT_DISPLAY_CAPTURED",
+                    "type=$eventType displayId=$eventDisplayId windowId=${event.windowId} pkg=$eventPkgName suppressed=$suppressedDisplayEvents",
+                    this
+                )
+                suppressedDisplayEvents = 0
+            } else {
+                suppressedDisplayEvents++
+            }
             maybeRetryBootBottom(eventDisplayId, event.packageName?.toString())
             return
         }
@@ -786,7 +914,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
                 limit = 12,
                 truncated = "..."
             ) { win ->
-                val winPkg = win.root?.packageName?.toString()
+                val winPkg = WindowPackages.packageOf(win.id)
                 "id=${win.id},disp=${win.displayId},type=${win.type},focused=${win.isFocused},active=${win.isActive},pkg=$winPkg"
             }
             DiagnosticsLogger.logEvent(
@@ -884,6 +1012,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
             contentResolver.unregisterContentObserver(focusChangeObserver)
         } catch (e: Exception) { /* ignore */ }
         instance = null
+        watchdog.stop()
         stopKeepAliveService()
         resetGestureState()
         return super.onUnbind(intent)
@@ -901,6 +1030,7 @@ class HomeKeyInterceptorService : AccessibilityService(), SharedPreferences.OnSh
         stopKeepAliveService()
         prefs.unregisterOnSharedPreferenceChangeListener(this)
         serviceScope.cancel()
+        watchdog.stop()
         lastFocusedDisplayId = null
         resetGestureState()
     }
